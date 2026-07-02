@@ -5,7 +5,7 @@ set -euo pipefail
 
 APP_DIR="/opt/instagram-operator"
 APP_USER="instagram"
-REPO_URL="${REPO_URL:-https://github.com/YOUR_USER/instagram-operator.git}"
+REPO_URL="${REPO_URL:-https://github.com/fayzullo1231/instagram-operator.git}"
 BRANCH="${BRANCH:-main}"
 
 echo "=== Instagram AI Operator — o'rnatish ==="

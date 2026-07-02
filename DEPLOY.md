@@ -12,7 +12,7 @@ git init
 git add .
 git commit -m "Instagram AI operator — production ready"
 git branch -M main
-git remote add origin https://github.com/SIZNING_USER/instagram-operator.git
+git remote add origin https://github.com/fayzullo1231/instagram-operator.git
 git push -u origin main
 ```
 
@@ -27,14 +27,14 @@ ssh root@13.140.146.78
 O'rnatish:
 
 ```bash
-export REPO_URL=https://github.com/SIZNING_USER/instagram-operator.git
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/SIZNING_USER/instagram-operator/main/deploy/install.sh)"
+export REPO_URL=https://github.com/fayzullo1231/instagram-operator.git
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/fayzullo1231/instagram-operator/main/deploy/install.sh)"
 ```
 
 Yoki qo'lda:
 
 ```bash
-git clone https://github.com/SIZNING_USER/instagram-operator.git /opt/instagram-operator
+git clone https://github.com/fayzullo1231/instagram-operator.git /opt/instagram-operator
 cd /opt/instagram-operator
 sudo useradd --system --home-dir /opt/instagram-operator instagram 2>/dev/null || true
 sudo chown -R instagram:instagram /opt/instagram-operator
