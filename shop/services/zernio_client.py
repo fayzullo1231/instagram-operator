@@ -186,13 +186,46 @@ class ZernioClient:
 
         return all_messages
 
-    def send_direct_message(self, conversation_id: str, text: str) -> None:
+    def send_direct_message(
+        self,
+        conversation_id: str,
+        text: str,
+        *,
+        image_url: str | None = None,
+    ) -> None:
         account_id = self.resolve_account_id()
+        payload: dict[str, Any] = {"accountId": account_id, "message": text or " "}
+        if image_url:
+            payload["attachments"] = [{"type": "image", "url": image_url}]
         self._request(
             "POST",
             f"/inbox/conversations/{conversation_id}/messages",
+            json=payload,
+        )
+
+    def send_private_reply_to_comment(
+        self,
+        post_id: str,
+        comment_id: str,
+        text: str,
+    ) -> None:
+        account_id = self.resolve_account_id()
+        self._request(
+            "POST",
+            f"/inbox/comments/{post_id}/{comment_id}/private-reply",
             json={"accountId": account_id, "message": text},
         )
+
+    def list_all_posts(self, limit: int | None = None) -> list[dict[str, Any]]:
+        account_id = self.resolve_account_id()
+        if limit is None:
+            limit = max(settings.INSTAGRAM_MEDIA_AMOUNT, 20)
+        data = self._request(
+            "GET",
+            "/inbox/comments",
+            params={"accountId": account_id, "limit": limit},
+        )
+        return data.get("data") or []
 
     def list_posts_with_comments(self, limit: int | None = None) -> list[dict[str, Any]]:
         account_id = self.resolve_account_id()

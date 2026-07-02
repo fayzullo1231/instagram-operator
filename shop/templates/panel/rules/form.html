@@ -6,44 +6,87 @@
   <a href="{% url 'panel_rule_list' %}" class="btn btn-secondary">← Orqaga</a>
 </div>
 
-<div class="card" style="max-width:720px">
-  <form method="post">
+<div class="card" style="max-width:820px">
+  <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">{{ form.video.label }}</label>
-        {{ form.video }}
-        <p class="form-hint">Muayyan video uchun — yoki bo'sh qoldiring (barcha postlar)</p>
+    {% if form.non_field_errors %}
+    <div class="alert alert-error">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="form-group">
+      <label class="form-label">Qaysi video/post?</label>
+      <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem">
+        {{ form.apply_to_all_videos }}
+        <span>Barcha videolarga qo'llash</span>
+      </label>
+      <div class="video-grid" id="video-select-grid">
+        {% for video in videos %}
+        <label class="video-card">
+          <input type="radio" name="video" value="{{ video.id }}"
+            {% if form.instance.video_id == video.id %}checked{% endif %}>
+          {% if video.thumbnail_url %}
+          <img src="{{ video.thumbnail_url }}" alt="" class="video-thumb">
+          {% else %}
+          <div class="video-thumb video-thumb-empty">🎬</div>
+          {% endif %}
+          <div class="video-card-title">{{ video.title|truncatechars:45 }}</div>
+        </label>
+        {% empty %}
+        <p class="form-hint">Avval <a href="{% url 'panel_video_list' %}">videolarni yuklang</a></p>
+        {% endfor %}
       </div>
+    </div>
+
+    <div class="form-row">
       <div class="form-group">
         <label class="form-label">{{ form.keyword.label }}</label>
         {{ form.keyword }}
       </div>
-    </div>
-    <div class="form-row">
       <div class="form-group">
         <label class="form-label">{{ form.match_type.label }}</label>
         {{ form.match_type }}
       </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">{{ form.priority.label }}</label>
+      {{ form.priority }}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Izoh ostidagi matn javob</label>
+      {{ form.public_reply }}
+      <p class="form-hint">Ixtiyoriy. Rasm bo'lsa ham qisqa matn yozish mumkin.</p>
+    </div>
+
+    <div class="form-row">
       <div class="form-group">
-        <label class="form-label">{{ form.priority.label }}</label>
-        {{ form.priority }}
+        <label class="form-label">Javob rasmi</label>
+        {{ form.reply_image }}
+        {% if rule and rule.reply_image %}
+        <p class="form-hint"><img src="{{ rule.reply_image.url }}" alt="" style="max-width:120px;border-radius:8px;margin-top:0.5rem"></p>
+        {% endif %}
+        <p class="form-hint">Rasm Direct xabar orqali yuboriladi</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Alohida DM rasmi</label>
+        {{ form.dm_image }}
+        {% if rule and rule.dm_image %}
+        <p class="form-hint"><img src="{{ rule.dm_image.url }}" alt="" style="max-width:120px;border-radius:8px;margin-top:0.5rem"></p>
+        {% endif %}
       </div>
     </div>
+
     <div class="form-group">
-      <label class="form-label">{{ form.public_reply.label }}</label>
-      {{ form.public_reply }}
-      <p class="form-hint">Izoh ostida hammaga ko'rinadigan javob</p>
-    </div>
-    <div class="form-group">
-      <label class="form-label">{{ form.dm_reply.label }}</label>
+      <label class="form-label">Direct matn xabar</label>
       {{ form.dm_reply }}
     </div>
+
     <div class="form-row">
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:0.5rem">
           {{ form.send_dm }}
-          <span class="form-label" style="margin:0">Direct xabar yuborish</span>
+          <span class="form-label" style="margin:0">Direct yuborish (matn/rasm)</span>
         </label>
       </div>
       <div class="form-group">
@@ -53,7 +96,20 @@
         </label>
       </div>
     </div>
+
     <button type="submit" class="btn btn-primary">Saqlash</button>
   </form>
 </div>
+
+<script>
+document.getElementById('apply-all-videos')?.addEventListener('change', function() {
+  const grid = document.getElementById('video-select-grid');
+  if (!grid) return;
+  grid.style.opacity = this.checked ? '0.4' : '1';
+  grid.style.pointerEvents = this.checked ? 'none' : 'auto';
+  if (this.checked) {
+    grid.querySelectorAll('input[type=radio]').forEach(r => r.checked = false);
+  }
+});
+</script>
 {% endblock %}

@@ -86,13 +86,32 @@ class CommentKeywordRule(models.Model):
         related_name="keyword_rules",
         null=True,
         blank=True,
-        help_text="Bo'sh qoldirilsa — barcha postlarga qo'llanadi",
+        help_text="Qaysi video/post uchun — tanlanmasa barcha postlarga qo'llanadi",
     )
     keyword = models.CharField(max_length=200, db_index=True)
     match_type = models.CharField(max_length=20, choices=MATCH_CHOICES, default=MATCH_CONTAINS)
-    public_reply = models.TextField(help_text="Izoh ostida ko'rinadigan javob")
-    dm_reply = models.TextField(blank=True, default="", help_text="Direct xabar (ixtiyoriy)")
-    send_dm = models.BooleanField(default=False)
+    public_reply = models.TextField(
+        blank=True,
+        default="",
+        help_text="Izoh ostidagi matn javob (ixtiyoriy, rasm bo'lsa ham yozish mumkin)",
+    )
+    reply_image = models.ImageField(
+        upload_to="rule_images/",
+        blank=True,
+        null=True,
+        help_text="Javob rasmi — Direct xabar orqali yuboriladi",
+    )
+    dm_reply = models.TextField(blank=True, default="", help_text="Direct matn xabar (ixtiyoriy)")
+    dm_image = models.ImageField(
+        upload_to="rule_images/dm/",
+        blank=True,
+        null=True,
+        help_text="Alohida DM rasmi (bo'sh bo'lsa reply_image ishlatiladi)",
+    )
+    send_dm = models.BooleanField(
+        default=True,
+        help_text="Rasm yoki DM matn yuborish (izohdan keyin Direct)",
+    )
     is_active = models.BooleanField(default=True)
     priority = models.IntegerField(default=0, help_text="Katta raqam — birinchi tekshiriladi")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -107,3 +126,7 @@ class CommentKeywordRule(models.Model):
     def __str__(self) -> str:
         scope = self.video.title if self.video_id and self.video else "Barcha postlar"
         return f"{self.keyword} → {scope}"
+
+    @property
+    def has_image_reply(self) -> bool:
+        return bool(self.reply_image or self.dm_image)

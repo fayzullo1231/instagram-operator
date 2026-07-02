@@ -113,7 +113,7 @@ def video_sync_instagram(request: HttpRequest) -> HttpResponse:
 
     try:
         service.client.ensure_login()
-        posts = service.client.zernio.list_posts_with_comments(limit=20)
+        posts = service.client.zernio.list_all_posts(limit=30)
         created = 0
         for post in posts:
             media_id = str(post.get("id", ""))
@@ -167,19 +167,27 @@ def rule_create(request: HttpRequest) -> HttpResponse:
     video_id = request.GET.get("video")
     if video_id:
         initial["video"] = video_id
-    form = CommentKeywordRuleForm(request.POST or None, initial=initial)
+    form = CommentKeywordRuleForm(request.POST or None, request.FILES or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Qoida qo'shildi")
         return redirect("panel_rule_list")
-    return render(request, "panel/rules/form.html", {"form": form, "title": "Yangi qoida"})
+    return render(
+        request,
+        "panel/rules/form.html",
+        {
+            "form": form,
+            "title": "Yangi qoida",
+            "videos": VideoPost.objects.filter(is_active=True).order_by("-updated_at"),
+        },
+    )
 
 
 @login_required(login_url="panel_login")
 @require_http_methods(["GET", "POST"])
 def rule_edit(request: HttpRequest, pk: int) -> HttpResponse:
     rule = get_object_or_404(CommentKeywordRule, pk=pk)
-    form = CommentKeywordRuleForm(request.POST or None, instance=rule)
+    form = CommentKeywordRuleForm(request.POST or None, request.FILES or None, instance=rule)
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Qoida yangilandi")
@@ -187,7 +195,12 @@ def rule_edit(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "panel/rules/form.html",
-        {"form": form, "title": "Qoidani tahrirlash", "rule": rule},
+        {
+            "form": form,
+            "title": "Qoidani tahrirlash",
+            "rule": rule,
+            "videos": VideoPost.objects.filter(is_active=True).order_by("-updated_at"),
+        },
     )
 
 

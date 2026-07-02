@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
+
 from shop.models import CommentKeywordRule
 from shop.utils.text import normalize_search_text
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_PUBLIC_IMAGE_REPLY = "Ma'lumotni Direct xabarda yubordik"
 
 
 def match_comment_rule(
@@ -38,7 +42,7 @@ def match_comment_rule(
             logger.info(
                 "Izoh qoidasi topildi: keyword='%s', video=%s",
                 rule.keyword,
-                rule.video_id or "global",
+                rule.video.title if rule.video_id else "global",
             )
             return rule
     return None
@@ -56,9 +60,35 @@ def _keyword_matches(normalized_comment: str, rule: CommentKeywordRule) -> bool:
     return keyword in normalized_comment
 
 
+def _absolute_media_url(relative_url: str) -> str:
+    if relative_url.startswith("http://") or relative_url.startswith("https://"):
+        return relative_url
+    base = settings.PUBLIC_BASE_URL.rstrip("/")
+    path = relative_url if relative_url.startswith("/") else f"/{relative_url}"
+    return f"{base}{path}"
+
+
+def resolve_rule_image_url(rule: CommentKeywordRule) -> str | None:
+    if rule.dm_image:
+        return _absolute_media_url(rule.dm_image.url)
+    if rule.reply_image:
+        return _absolute_media_url(rule.reply_image.url)
+    return None
+
+
 def rule_to_response(rule: CommentKeywordRule) -> dict:
+    image_url = resolve_rule_image_url(rule)
+    public_reply = (rule.public_reply or "").strip()
+    dm_reply = (rule.dm_reply or "").strip() or None
+
+    if not public_reply and image_url:
+        public_reply = DEFAULT_PUBLIC_IMAGE_REPLY
+
+    send_dm = rule.send_dm and bool(dm_reply or image_url)
+
     return {
-        "reply": rule.public_reply,
-        "dm_reply": rule.dm_reply.strip() or None,
-        "send_dm": rule.send_dm and bool(rule.dm_reply.strip()),
+        "reply": public_reply,
+        "dm_reply": dm_reply,
+        "send_dm": send_dm,
+        "image_url": image_url,
     }

@@ -12,7 +12,7 @@ class VideoPostAdmin(admin.ModelAdmin):
 
 @admin.register(CommentKeywordRule)
 class CommentKeywordRuleAdmin(admin.ModelAdmin):
-    list_display = ("keyword", "video", "match_type", "is_active", "priority", "send_dm")
+    list_display = ("keyword", "video", "match_type", "is_active", "priority", "send_dm", "has_image_reply")
     list_filter = ("is_active", "match_type", "send_dm")
     search_fields = ("keyword", "public_reply")
 

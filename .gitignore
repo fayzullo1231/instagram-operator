@@ -19,6 +19,7 @@ instagram_data/
 data/*.json
 data/*.sqlite3
 data/static/
+data/media/
 *.sqlite3
 *.log
 .DS_Store

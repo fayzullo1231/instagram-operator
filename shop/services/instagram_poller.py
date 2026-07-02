@@ -239,16 +239,43 @@ class InstagramPoller:
                 if rule:
                     preset = rule_to_response(rule)
                     public_reply = preset["reply"]
-                    if preset["send_dm"] and preset["dm_reply"]:
-                        dm_sent = self._try_send_dm(item.get("user_id", ""), preset["dm_reply"])
-                        if not dm_sent:
+                    image_url = preset.get("image_url")
+
+                    if public_reply:
+                        self.client.reply_to_comment(
+                            item["media_id"],
+                            item["comment_id"],
+                            public_reply,
+                            item.get("username", ""),
+                        )
+
+                    if preset["send_dm"]:
+                        dm_text = preset.get("dm_reply") or ""
+                        if image_url:
+                            dm_sent = self._try_send_dm(
+                                item.get("user_id", ""),
+                                dm_text,
+                                image_url=image_url,
+                            )
+                        elif dm_text:
+                            dm_sent = self._try_send_private_reply(
+                                item["media_id"],
+                                item["comment_id"],
+                                dm_text,
+                                item.get("user_id", ""),
+                            )
+                        else:
+                            dm_sent = True
+
+                        if not dm_sent and not public_reply:
                             public_reply = COMMENT_DM_FAILED_REPLY
-                    self.client.reply_to_comment(
-                        item["media_id"],
-                        item["comment_id"],
-                        public_reply,
-                        item.get("username", ""),
-                    )
+                            self.client.reply_to_comment(
+                                item["media_id"],
+                                item["comment_id"],
+                                public_reply,
+                                item.get("username", ""),
+                            )
+
                     self._mark_processed(key, ProcessedMessage.TYPE_COMMENT)
                     self._add_to_baseline(item["comment_id"], comment=True)
                     processed += 1
@@ -294,15 +321,40 @@ class InstagramPoller:
 
         return processed
 
-    def _try_send_dm(self, user_id: str, text: str) -> bool:
-        if not user_id or not text:
+    def _try_send_dm(
+        self,
+        user_id: str,
+        text: str,
+        *,
+        image_url: str | None = None,
+    ) -> bool:
+        if not user_id or (not text and not image_url):
             return False
         try:
-            self.client.send_direct_to_user(user_id, text)
-            logger.info("Izohdan DM yuborildi: user=%s", user_id)
+            self.client.send_direct_to_user(user_id, text, image_url=image_url)
+            logger.info("Izohdan DM yuborildi: user=%s image=%s", user_id, bool(image_url))
             return True
         except Exception as exc:
             logger.warning("Izohdan DM yuborib bo'lmadi (user=%s): %s", user_id, exc)
+            return False
+
+    def _try_send_private_reply(
+        self,
+        media_id: str,
+        comment_id: str,
+        text: str,
+        user_id: str,
+    ) -> bool:
+        if not text:
+            return False
+        try:
+            self.client.send_private_comment_reply(media_id, comment_id, text)
+            logger.info("Izohdan private reply yuborildi: comment=%s", comment_id)
+            return True
+        except Exception as exc:
+            logger.warning("Private reply xatosi (comment=%s): %s", comment_id, exc)
+            if user_id:
+                return self._try_send_dm(user_id, text)
             return False
 
     def get_status(self) -> dict:

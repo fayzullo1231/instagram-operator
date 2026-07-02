@@ -72,6 +72,9 @@ TIME_ZONE = "Asia/Tashkent"
 USE_I18N = True
 USE_TZ = True
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "data" / "media"
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8010").rstrip("/")
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "shop" / "static"]
 STATIC_ROOT = BASE_DIR / "data" / "static"

@@ -152,11 +152,17 @@ class InstagramClient:
                     return str(conversation["id"])
         return None
 
-    def send_direct_to_user(self, user_id: str, text: str) -> None:
+    def send_direct_to_user(
+        self,
+        user_id: str,
+        text: str,
+        *,
+        image_url: str | None = None,
+    ) -> None:
         thread_id = self.find_conversation_for_user(user_id)
         if not thread_id:
             raise RuntimeError("Foydalanuvchi bilan DM suhbati topilmadi")
-        self.send_direct_reply(thread_id, text)
+        self.send_direct_reply(thread_id, text, image_url=image_url)
 
     def fetch_new_direct_messages(self) -> list[dict[str, Any]]:
         if not self.is_baseline_ready():
@@ -244,10 +250,29 @@ class InstagramClient:
             logger.info("Instagram poll: %d ta yangi izoh", len(comments))
         return comments
 
-    def send_direct_reply(self, thread_id: str, text: str) -> None:
+    def send_direct_reply(
+        self,
+        thread_id: str,
+        text: str,
+        *,
+        image_url: str | None = None,
+    ) -> None:
         self.ensure_login()
-        self.zernio.send_direct_message(thread_id, text)
-        logger.info("DM ga javob yuborildi: thread=%s", thread_id)
+        self.zernio.send_direct_message(thread_id, text, image_url=image_url)
+        logger.info("DM ga javob yuborildi: thread=%s image=%s", thread_id, bool(image_url))
+
+    def send_private_comment_reply(
+        self,
+        media_id: str,
+        comment_id: str,
+        text: str,
+        *,
+        image_url: str | None = None,
+    ) -> None:
+        self.ensure_login()
+        self.zernio.send_private_reply_to_comment(media_id, comment_id, text or " ")
+        if image_url:
+            logger.info("Private reply (rasm alohida DM): media=%s", media_id)
 
     def reply_to_comment(
         self,
