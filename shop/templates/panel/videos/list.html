@@ -1,0 +1,62 @@
+{% extends "panel/base.html" %}
+{% block title %}Videolar{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Videolar / Postlar</h1>
+  <div class="actions">
+    <form method="post" action="{% url 'panel_video_sync' %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-secondary">↻ Instagram dan yuklash</button>
+    </form>
+    <a href="{% url 'panel_video_create' %}" class="btn btn-primary">+ Qo'lda qo'shish</a>
+  </div>
+</div>
+
+<div class="card">
+  {% if videos %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nomi</th>
+          <th>Media ID</th>
+          <th>Qoidalar</th>
+          <th>Holat</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for video in videos %}
+        <tr>
+          <td>
+            <strong>{{ video.title|truncatechars:50 }}</strong>
+            {% if video.caption %}<br><small style="color:var(--muted)">{{ video.caption|truncatechars:80 }}</small>{% endif %}
+          </td>
+          <td><code style="font-size:0.75rem">{{ video.media_id|truncatechars:24 }}</code></td>
+          <td>
+            <a href="{% url 'panel_rule_list' %}?video={{ video.id }}">{{ video.rule_count }} ta</a>
+          </td>
+          <td>{% if video.is_active %}<span class="badge badge-success">Faol</span>{% else %}<span class="badge badge-muted">O'chiq</span>{% endif %}</td>
+          <td>
+            <div class="actions">
+              <a href="{% url 'panel_rule_create' %}?video={{ video.id }}" class="btn btn-secondary btn-sm">+ Qoida</a>
+              <a href="{% url 'panel_video_edit' video.pk %}" class="btn btn-secondary btn-sm">Tahrir</a>
+              <form method="post" action="{% url 'panel_video_delete' video.pk %}" onsubmit="return confirm('O\'chirilsinmi?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">×</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>Hali post qo'shilmagan.</p>
+    <p style="margin-top:0.5rem"><a href="{% url 'panel_video_sync' %}">Instagram dan yuklash</a> yoki <a href="{% url 'panel_video_create' %}">qo'lda qo'shish</a></p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

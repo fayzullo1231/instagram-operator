@@ -1,0 +1,68 @@
+{% extends "panel/base.html" %}
+{% block title %}Izoh qoidalari{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Izoh kalit so'z qoidalari</h1>
+  <a href="{% url 'panel_rule_create' %}{% if selected_video %}?video={{ selected_video }}{% endif %}" class="btn btn-primary">+ Yangi qoida</a>
+</div>
+
+<div class="card" style="margin-bottom:1rem;padding:1rem">
+  <form method="get" style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+    <label class="form-label" style="margin:0">Post bo'yicha filtr:</label>
+    <select name="video" class="form-select" style="max-width:280px" onchange="this.form.submit()">
+      <option value="">— Barcha postlar —</option>
+      {% for v in videos %}
+      <option value="{{ v.id }}" {% if selected_video == v.id|stringformat:"s" %}selected{% endif %}>{{ v.title|truncatechars:40 }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="card">
+  <p style="color:var(--muted);margin-bottom:1rem;font-size:0.9rem">
+    Foydalanuvchi izohda kalit so'z yozsa, belgilangan javob avtomatik yuboriladi.
+    Post tanlanmasa — qoida barcha videolarga qo'llanadi.
+  </p>
+  {% if rules %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Kalit so'z</th>
+          <th>Moslik</th>
+          <th>Post</th>
+          <th>Javob</th>
+          <th>DM</th>
+          <th>Ustuvorlik</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rule in rules %}
+        <tr>
+          <td><strong>{{ rule.keyword }}</strong></td>
+          <td>{{ rule.get_match_type_display }}</td>
+          <td>{% if rule.video %}{{ rule.video.title|truncatechars:25 }}{% else %}<span class="badge badge-muted">Barchasi</span>{% endif %}</td>
+          <td style="max-width:200px">{{ rule.public_reply|truncatechars:60 }}</td>
+          <td>{% if rule.send_dm %}<span class="badge badge-success">Ha</span>{% else %}—{% endif %}</td>
+          <td>{{ rule.priority }}</td>
+          <td>
+            <div class="actions">
+              <form method="post" action="{% url 'panel_rule_toggle' rule.pk %}">{% csrf_token %}<button class="btn btn-secondary btn-sm">{% if rule.is_active %}Off{% else %}On{% endif %}</button></form>
+              <a href="{% url 'panel_rule_edit' rule.pk %}" class="btn btn-secondary btn-sm">Tahrir</a>
+              <form method="post" action="{% url 'panel_rule_delete' rule.pk %}" onsubmit="return confirm('O\'chirilsinmi?')">{% csrf_token %}<button class="btn btn-danger btn-sm">×</button></form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>Qoida yo'q.</p>
+    <a href="{% url 'panel_rule_create' %}" class="btn btn-primary" style="margin-top:1rem">Birinchi qoidani qo'shing</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

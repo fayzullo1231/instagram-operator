@@ -1,0 +1,73 @@
+{% extends "panel/base.html" %}
+{% block title %}Bosh sahifa{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Bosh sahifa</h1>
+  <a href="{% url 'panel_rule_create' %}" class="btn btn-primary">+ Yangi qoida</a>
+</div>
+
+<div class="card-grid">
+  <div class="card stat-card">
+    <div class="stat-value">{{ stats.products }}</div>
+    <div class="stat-label">Mahsulotlar</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ stats.videos }}</div>
+    <div class="stat-label">Videolar / Postlar</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ stats.rules }}</div>
+    <div class="stat-label">Faol qoidalar</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{% if instagram.connected %}✓{% else %}✗{% endif %}</div>
+    <div class="stat-label">Instagram {% if instagram.connected %}@{{ instagram.username }}{% else %}ulanmagan{% endif %}</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+  <div class="card">
+    <h2 style="margin-bottom:1rem;font-size:1.1rem">So'nggi qoidalar</h2>
+    {% if recent_rules %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Kalit so'z</th><th>Post</th><th>Holat</th></tr></thead>
+        <tbody>
+          {% for rule in recent_rules %}
+          <tr>
+            <td><strong>{{ rule.keyword }}</strong></td>
+            <td>{% if rule.video %}{{ rule.video.title|truncatechars:30 }}{% else %}<span class="badge badge-muted">Barchasi</span>{% endif %}</td>
+            <td>{% if rule.is_active %}<span class="badge badge-success">Faol</span>{% else %}<span class="badge badge-muted">O'chiq</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-state">Hali qoida yo'q. <a href="{% url 'panel_rule_create' %}">Birinchi qoidani qo'shing</a></p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:1rem;font-size:1.1rem">Videolar</h2>
+    {% if recent_videos %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nomi</th><th>Qoidalar</th></tr></thead>
+        <tbody>
+          {% for video in recent_videos %}
+          <tr>
+            <td>{{ video.title|truncatechars:40 }}</td>
+            <td><span class="badge badge-warning">{{ video.rule_count }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <a href="{% url 'panel_video_list' %}" class="btn btn-secondary btn-sm" style="margin-top:1rem">Barcha postlar</a>
+    {% else %}
+    <p class="empty-state"><a href="{% url 'panel_video_sync' %}">Instagram dan yuklash</a></p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

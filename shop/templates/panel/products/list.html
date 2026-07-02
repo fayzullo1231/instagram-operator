@@ -1,0 +1,37 @@
+{% extends "panel/base.html" %}
+{% block title %}Mahsulotlar{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Mahsulotlar</h1>
+</div>
+
+<div class="card" style="margin-bottom:1rem;padding:1rem">
+  <form method="get" style="display:flex;gap:0.75rem">
+    <input type="text" name="q" value="{{ q }}" class="form-input" placeholder="Qidirish..." style="max-width:320px">
+    <button type="submit" class="btn btn-secondary">Qidirish</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Nomi</th><th>Narx</th><th>Manba</th><th>Kategoriya</th></tr>
+      </thead>
+      <tbody>
+        {% for product in products %}
+        <tr>
+          <td>{{ product.product_name }}</td>
+          <td>{{ product.price|floatformat:0 }} so'm</td>
+          <td><span class="badge badge-muted">{{ product.source }}</span></td>
+          <td>{{ product.category|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="empty-state">Topilmadi</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if products %}<p class="form-hint" style="margin-top:0.75rem">Ko'rsatilmoqda: {{ products|length }} ta (max 100)</p>{% endif %}
+</div>
+{% endblock %}

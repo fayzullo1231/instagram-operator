@@ -1,0 +1,44 @@
+{% extends "panel/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">{{ title }}</h1>
+  <a href="{% url 'panel_video_list' %}" class="btn btn-secondary">← Orqaga</a>
+</div>
+
+<div class="card" style="max-width:640px">
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-group">
+      <label class="form-label">{{ form.media_id.label }}</label>
+      {{ form.media_id }}
+      <p class="form-hint">Instagram post media ID (Zernio yoki post URL dan)</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">{{ form.title.label }}</label>
+      {{ form.title }}
+    </div>
+    <div class="form-group">
+      <label class="form-label">{{ form.caption.label }}</label>
+      {{ form.caption }}
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">{{ form.permalink.label }}</label>
+        {{ form.permalink }}
+      </div>
+      <div class="form-group">
+        <label class="form-label">{{ form.thumbnail_url.label }}</label>
+        {{ form.thumbnail_url }}
+      </div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:0.5rem">
+        {{ form.is_active }}
+        <span class="form-label" style="margin:0">Faol</span>
+      </label>
+    </div>
+    <button type="submit" class="btn btn-primary">Saqlash</button>
+  </form>
+</div>
+{% endblock %}

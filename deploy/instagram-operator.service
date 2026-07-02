@@ -1,0 +1,21 @@
+[Unit]
+Description=Kulol Optom Instagram AI Operator (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=instagram
+Group=instagram
+WorkingDirectory=/opt/instagram-operator
+EnvironmentFile=/opt/instagram-operator/.env
+ExecStart=/opt/instagram-operator/venv/bin/gunicorn config.wsgi:application \
+    --bind 0.0.0.0:8010 \
+    --workers 2 \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile -
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

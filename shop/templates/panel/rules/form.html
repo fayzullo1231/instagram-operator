@@ -1,0 +1,59 @@
+{% extends "panel/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">{{ title }}</h1>
+  <a href="{% url 'panel_rule_list' %}" class="btn btn-secondary">← Orqaga</a>
+</div>
+
+<div class="card" style="max-width:720px">
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">{{ form.video.label }}</label>
+        {{ form.video }}
+        <p class="form-hint">Muayyan video uchun — yoki bo'sh qoldiring (barcha postlar)</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">{{ form.keyword.label }}</label>
+        {{ form.keyword }}
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">{{ form.match_type.label }}</label>
+        {{ form.match_type }}
+      </div>
+      <div class="form-group">
+        <label class="form-label">{{ form.priority.label }}</label>
+        {{ form.priority }}
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">{{ form.public_reply.label }}</label>
+      {{ form.public_reply }}
+      <p class="form-hint">Izoh ostida hammaga ko'rinadigan javob</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">{{ form.dm_reply.label }}</label>
+      {{ form.dm_reply }}
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:0.5rem">
+          {{ form.send_dm }}
+          <span class="form-label" style="margin:0">Direct xabar yuborish</span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:0.5rem">
+          {{ form.is_active }}
+          <span class="form-label" style="margin:0">Faol</span>
+        </label>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Saqlash</button>
+  </form>
+</div>
+{% endblock %}
