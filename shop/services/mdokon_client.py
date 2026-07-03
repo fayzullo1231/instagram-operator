@@ -11,11 +11,19 @@ logger = logging.getLogger(__name__)
 class MDoKonClient:
     def __init__(self) -> None:
         self.api_url = settings.MDOKON_API_URL
-        self.api_key = settings.MDOKON_API_KEY
-        self.timeout = httpx.Timeout(30.0, connect=10.0)
+        self.api_key = (settings.MDOKON_API_KEY or "").strip()
+        self.timeout = httpx.Timeout(60.0, connect=15.0)
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_url and self.api_key)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def fetch_all_products(self) -> list[dict[str, Any]]:
+        if not self.is_configured:
+            logger.warning("MDoKon API: MDOKON_API_KEY sozlanmagan")
+            return []
+
         logger.info("MDoKon API: mahsulotlar yuklanmoqda")
 
         with httpx.Client(timeout=self.timeout) as client:

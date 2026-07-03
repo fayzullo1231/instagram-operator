@@ -6,6 +6,7 @@ urlpatterns = [
     path("login/", panel_views.panel_login, name="panel_login"),
     path("logout/", panel_views.panel_logout, name="panel_logout"),
     path("", panel_views.panel_dashboard, name="panel_dashboard"),
+    path("sync/products/", panel_views.product_sync_now, name="panel_product_sync"),
     path("videos/", panel_views.video_list, name="panel_video_list"),
     path("videos/create/", panel_views.video_create, name="panel_video_create"),
     path("videos/<int:pk>/edit/", panel_views.video_edit, name="panel_video_edit"),

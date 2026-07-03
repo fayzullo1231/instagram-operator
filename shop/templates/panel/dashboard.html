@@ -9,8 +9,39 @@
 <div class="card-grid">
   <div class="card stat-card">
     <div class="stat-value">{{ stats.products }}</div>
-    <div class="stat-label">Mahsulotlar</div>
+    <div class="stat-label">Mahsulotlar (jami)</div>
   </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ sync.kuloloptom_count }}</div>
+    <div class="stat-label">KulolOptom API</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ sync.mdokon_count }}</div>
+    <div class="stat-label">MDoKon API</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-value">{{ sync.linko_count }}</div>
+    <div class="stat-label">Linko API</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem">
+  <h2 style="margin-bottom:0.75rem;font-size:1.1rem">Katalog sinxronizatsiyasi</h2>
+  <p style="margin-bottom:0.75rem;color:#666">
+    KulolOptom: {% if sync.kuloloptom_configured %}sozlangan{% else %}<strong style="color:#c00">login/parol kerak</strong>{% endif %}
+    · MDoKon: {% if sync.mdokon_configured %}sozlangan{% else %}<strong style="color:#c00">API key kerak</strong>{% endif %}
+    {% if sync.last_sync %}· Oxirgi: {{ sync.last_sync }}{% endif %}
+  </p>
+  {% if sync.last_errors %}
+  <p style="margin-bottom:0.75rem;color:#c00">Xatolar: {% for source, err in sync.last_errors.items %}{{ source }}: {{ err|truncatechars:80 }}{% if not forloop.last %}; {% endif %}{% endfor %}</p>
+  {% endif %}
+  <form method="post" action="{% url 'panel_product_sync' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary btn-sm">Mahsulotlarni yangilash</button>
+  </form>
+</div>
+
+<div class="card-grid">
   <div class="card stat-card">
     <div class="stat-value">{{ stats.videos }}</div>
     <div class="stat-label">Videolar / Postlar</div>

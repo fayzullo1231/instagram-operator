@@ -41,6 +41,26 @@ def panel_logout(request: HttpRequest) -> HttpResponse:
 
 
 @login_required(login_url="panel_login")
+@require_POST
+def product_sync_now(request: HttpRequest) -> HttpResponse:
+    try:
+        result = ProductSyncService().sync_all()
+        total = int(result.get("total_count") or 0)
+        errors = result.get("errors") or {}
+        if errors:
+            messages.warning(
+                request,
+                f"Sinxronizatsiya: {total} ta mahsulot. Xatolar: {', '.join(errors.keys())}",
+            )
+        else:
+            messages.success(request, f"Mahsulotlar yangilandi: {total} ta")
+    except Exception as exc:
+        logger.exception("Panel sinxronizatsiya xatosi: %s", exc)
+        messages.error(request, f"Sinxronizatsiya xatosi: {exc}")
+    return redirect("panel_dashboard")
+
+
+@login_required(login_url="panel_login")
 def panel_dashboard(request: HttpRequest) -> HttpResponse:
     instagram = InstagramService().get_status()
     sync = ProductSyncService().get_sync_status()

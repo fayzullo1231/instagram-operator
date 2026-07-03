@@ -13,6 +13,9 @@ read -rp "OPENAI_API_KEY: " OPENAI_KEY
 read -rp "ZERNIO_API_KEY: " ZERNIO_KEY
 read -rp "LINKO_API_TOKEN [Enter=standart]: " LINKO_TOKEN
 read -rp "MDOKON_API_KEY [Enter=standart]: " MDOKON_KEY
+read -rp "KULOLOPTOM_LOGIN (TezPOS admin): " KO_LOGIN
+read -rsp "KULOLOPTOM_PASSWORD: " KO_PASS
+echo ""
 
 LINKO_TOKEN="${LINKO_TOKEN:-eca09f333e011e3d1b3b4a722ca11d203a168635}"
 MDOKON_KEY="${MDOKON_KEY:-5ddeec9a-a108-11f0-b8d0-0242ac130001}"
@@ -47,12 +50,19 @@ LINKO_API_TOKEN=${LINKO_TOKEN}
 MDOKON_API_URL=https://cabinet.mdokon.uz/services/web/api/report-balance-product-api
 MDOKON_API_KEY=${MDOKON_KEY}
 
-# TezPOS
+# TezPOS (serverda 127.0.0.1:8000)
 TEZPOS_ENABLED=true
 TEZPOS_API_URL=http://127.0.0.1:8000
 TEZPOS_SERVER_NAME=demo
 TEZPOS_LOGIN=demo
 TEZPOS_PASSWORD=demo123
+
+# KulolOptom katalog (http://127.0.0.1:8000/kuloloptom-2/product/?all=true)
+KULOLOPTOM_ENABLED=true
+KULOLOPTOM_SERVER_NAME=kuloloptom-2
+KULOLOPTOM_API_TOKEN=
+KULOLOPTOM_LOGIN=${KO_LOGIN}
+KULOLOPTOM_PASSWORD=${KO_PASS}
 
 # Instagram Zernio
 INSTAGRAM_ENABLED=true

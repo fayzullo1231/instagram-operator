@@ -15,10 +15,11 @@ class KulolOptomClient:
     def __init__(self) -> None:
         self.base_url = settings.TEZPOS_API_URL.rstrip("/")
         self.server_name = settings.KULOLOPTOM_SERVER_NAME
-        self.api_token = settings.KULOLOPTOM_API_TOKEN
-        self.login = settings.KULOLOPTOM_LOGIN
-        self.password = settings.KULOLOPTOM_PASSWORD
+        self.api_token = (settings.KULOLOPTOM_API_TOKEN or settings.TEZPOS_API_TOKEN or "").strip()
+        self.login = (settings.KULOLOPTOM_LOGIN or settings.TEZPOS_LOGIN or "").strip()
+        self.password = (settings.KULOLOPTOM_PASSWORD or settings.TEZPOS_PASSWORD or "").strip()
         self.timeout = httpx.Timeout(60.0, connect=15.0)
+        self._cached_token = ""
 
     @property
     def is_configured(self) -> bool:
@@ -30,7 +31,8 @@ class KulolOptomClient:
         )
 
     def _auth_headers(self) -> dict[str, str]:
-        token = self.api_token or self._login()
+        token = self.api_token or self._cached_token or self._login()
+        self._cached_token = token
         return {
             "Authorization": f"Token {token}",
             "X-Server-Name": self.server_name,
