@@ -218,8 +218,6 @@ class AIOperatorService:
             channel=channel,
         )
         intro = IMAGE_FOUND_REPLY
-        if detected_label:
-            intro = f"Rasmda: {detected_label}\n\n{IMAGE_FOUND_REPLY}"
         reply = f"{intro}\n\n{product_reply}"
 
         return ChatResponse(

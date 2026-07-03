@@ -5,6 +5,7 @@ class Product(models.Model):
     SOURCE_LINKO = "linko"
     SOURCE_MDOKON = "mdokon"
     SOURCE_TEZPOS = "tezpos"
+    SOURCE_KULOLOPTOM = "kuloloptom"
 
     external_id = models.CharField(max_length=255)
     product_name = models.CharField(max_length=500, db_index=True)

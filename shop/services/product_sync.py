@@ -4,6 +4,7 @@ from django.db.models import Max
 
 from shop.models import Product
 from shop.services.catalog_config import infer_product_metadata
+from shop.services.kuloloptom_client import KulolOptomClient
 from shop.services.linko_client import LinkoClient
 from shop.services.mdokon_client import MDoKonClient
 from shop.services.tezpos_client import TezPOSClient
@@ -16,6 +17,7 @@ class ProductSyncService:
         self.linko_client = LinkoClient()
         self.mdokon_client = MDoKonClient()
         self.tezpos_client = TezPOSClient()
+        self.kuloloptom_client = KulolOptomClient()
 
     def sync_all(self) -> dict[str, int]:
         logger.info("Sinxronizatsiya boshlandi...")
@@ -23,6 +25,11 @@ class ProductSyncService:
         linko_raw = self.linko_client.fetch_all_products()
         mdokon_raw = self.mdokon_client.fetch_all_products()
         tezpos_raw = self.tezpos_client.fetch_all_products() if self.tezpos_client.is_configured else []
+        kuloloptom_raw = (
+            self.kuloloptom_client.fetch_all_products()
+            if self.kuloloptom_client.is_configured
+            else []
+        )
 
         linko_products = [
             self.linko_client.parse_product(item)
@@ -39,23 +46,31 @@ class ProductSyncService:
             for item in tezpos_raw
             if item.get("name") and item.get("is_active", True)
         ]
+        kuloloptom_products = [
+            self.kuloloptom_client.parse_product(item)
+            for item in kuloloptom_raw
+            if item.get("name") and item.get("is_active", True)
+        ]
 
         linko_count = self._upsert_products(linko_products)
         mdokon_count = self._upsert_products(mdokon_products)
         tezpos_count = self._upsert_products(tezpos_products)
+        kuloloptom_count = self._upsert_products(kuloloptom_products)
 
-        total = linko_count + mdokon_count + tezpos_count
+        total = linko_count + mdokon_count + tezpos_count + kuloloptom_count
         logger.info(
-            "Sinxronizatsiya tugadi: linko=%d, mdokon=%d, tezpos=%d, jami=%d",
+            "Sinxronizatsiya tugadi: linko=%d, mdokon=%d, tezpos=%d, kuloloptom=%d, jami=%d",
             linko_count,
             mdokon_count,
             tezpos_count,
+            kuloloptom_count,
             total,
         )
         return {
             "linko_count": linko_count,
             "mdokon_count": mdokon_count,
             "tezpos_count": tezpos_count,
+            "kuloloptom_count": kuloloptom_count,
             "total_count": total,
         }
 
@@ -100,12 +115,14 @@ class ProductSyncService:
         linko_count = Product.objects.filter(source="linko").count()
         mdokon_count = Product.objects.filter(source="mdokon").count()
         tezpos_count = Product.objects.filter(source="tezpos").count()
+        kuloloptom_count = Product.objects.filter(source="kuloloptom").count()
         last_sync = Product.objects.aggregate(last=Max("updated_at"))["last"]
 
         return {
             "linko_count": linko_count,
             "mdokon_count": mdokon_count,
             "tezpos_count": tezpos_count,
-            "total_count": linko_count + mdokon_count + tezpos_count,
+            "kuloloptom_count": kuloloptom_count,
+            "total_count": linko_count + mdokon_count + tezpos_count + kuloloptom_count,
             "last_sync": last_sync.isoformat() if last_sync else None,
         }
