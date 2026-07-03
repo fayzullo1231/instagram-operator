@@ -6,7 +6,13 @@ from django.conf import settings
 from rapidfuzz import fuzz, process
 
 from shop.models import Product
-from shop.services.catalog_config import BRAND_CATEGORIES, CATEGORY_SYNONYMS, canonical_category, expand_search_terms
+from shop.services.catalog_config import (
+    BRAND_CATEGORIES,
+    BRAND_SEARCH_ALIASES,
+    CATEGORY_SYNONYMS,
+    canonical_category,
+    expand_search_terms,
+)
 from shop.services.image_hint import format_detected_label, normalize_image_hint
 from shop.utils.text import extract_search_keywords, normalize_search_text
 from shop.utils.transliterate import latinize, product_matches_grade, product_name_latin, weights_match
@@ -52,6 +58,7 @@ class ProductSearchService:
             logger.debug("Qidiruv kalit so'z yo'q: '%s'", query)
             return SearchResult(matches=[])
 
+        search_text = latinize(search_text) or search_text
         logger.debug("Qidiruv matni: '%s' (asl: '%s')", search_text, query)
         terms = expand_search_terms(search_text)
         category = ""
@@ -80,6 +87,10 @@ class ProductSearchService:
         keyword = self._keyword_matches(products, search_text, terms)
         if keyword:
             return SearchResult(matches=keyword[: self.top_n])
+
+        if not self._significant_search_terms(terms, normalize_search_text(search_text)):
+            logger.info("Qidiruv: muhim so'z yo'q (query='%s')", query)
+            return SearchResult(matches=[])
 
         fuzzy = self._fuzzy_matches(products, search_text)
         logger.info("Qidiruv natijasi: query='%s', topildi=%d", query, len(fuzzy))
@@ -118,6 +129,31 @@ class ProductSearchService:
         matches.sort(key=lambda item: item.product.product_name.lower())
         return matches
 
+    @staticmethod
+    def _significant_search_terms(terms: list[str], normalized_query: str) -> list[str]:
+        tokens: list[str] = []
+        seen: set[str] = set()
+        for term in [*terms, *normalized_query.split()]:
+            term = term.strip()
+            if len(term) <= 2 or term.isdigit():
+                continue
+            if re.fullmatch(r"\d+(?:g|gr|kg|ml|l)", term):
+                continue
+            if term not in seen:
+                seen.add(term)
+                tokens.append(term)
+        return tokens
+
+    @classmethod
+    def _term_in_haystack(cls, term: str, haystack: str) -> bool:
+        if term in haystack:
+            return True
+        for aliases in BRAND_SEARCH_ALIASES.values():
+            alias_set = set(aliases)
+            if term in alias_set:
+                return any(alias in haystack for alias in alias_set)
+        return False
+
     def _exact_matches(
         self,
         products: list[Product],
@@ -132,7 +168,15 @@ class ProductSearchService:
             normalized_name = normalize_search_text(product.product_name)
             if normalized_name in query_terms or normalized_query == normalized_name:
                 matches.append(SearchMatch(product=product, score=100.0, match_type="exact"))
-            elif normalized_query in normalized_name or normalized_name in normalized_query:
+            elif normalized_query.isdigit():
+                continue
+            elif len(normalized_query) >= 4 and normalized_query in normalized_name:
+                matches.append(SearchMatch(product=product, score=98.0, match_type="exact"))
+            elif (
+                len(normalized_query) >= 4
+                and len(normalized_name) >= 4
+                and normalized_name in normalized_query
+            ):
                 matches.append(SearchMatch(product=product, score=98.0, match_type="exact"))
 
         return matches
@@ -144,14 +188,17 @@ class ProductSearchService:
         terms: list[str],
     ) -> list[SearchMatch]:
         normalized_query = normalize_search_text(search_text)
-        query_terms = set(terms + normalized_query.split())
+        significant = self._significant_search_terms(terms, normalized_query)
+        if not significant:
+            return []
+
         matches: list[SearchMatch] = []
 
         for product in products:
-            haystack = normalize_search_text(
+            haystack = product_name_latin(
                 f"{product.product_name} {product.keywords} {product.category}"
             )
-            if any(term in haystack for term in query_terms if len(term) > 2):
+            if all(self._term_in_haystack(term, haystack) for term in significant):
                 matches.append(SearchMatch(product=product, score=90.0, match_type="keyword"))
 
         return matches

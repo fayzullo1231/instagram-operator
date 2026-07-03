@@ -259,6 +259,48 @@ def test_image_search_returns_single_exact_match(mock_all):
 
 
 @patch("shop.services.product_search.Product.objects.all")
+def test_search_president_brand(mock_all):
+    products = [
+        _product("ALSAFI SIR 400 gr", 48000),
+        _product("Antica Makaron 400gr", 10000),
+        _product("Asal 400gr", 10000),
+        _product("President sut 400gr", 12000),
+        _product("President sir 200gr", 15000),
+        _product("PREZIDENT maslo 1l", 25000),
+    ]
+    mock_all.return_value.order_by.return_value = products
+    service = ProductSearchService()
+
+    for query in ("president", "President", "Президент", "prezident"):
+        result = service.search(query)
+        names = {match.product.product_name for match in result.matches}
+        assert names, f"Natija bo'sh: {query}"
+        assert all(
+            "president" in name.lower() or "prezident" in name.lower()
+            for name in names
+        ), f"Noto'g'ri brend: {query} -> {names}"
+        assert "ALSAFI SIR 400 gr" not in names
+
+
+@patch("shop.services.product_search.Product.objects.all")
+def test_search_does_not_match_all_400gr_products(mock_all):
+    products = [
+        _product("ALSAFI SIR 400 gr", 48000),
+        _product("Antica Makaron 400gr", 10000),
+        _product("Asal 400gr", 10000),
+        _product("President sut 400gr", 12000),
+    ]
+    mock_all.return_value.order_by.return_value = products
+    service = ProductSearchService()
+
+    result = service.search("president 400")
+    names = [match.product.product_name for match in result.matches]
+    assert names == ["President sut 400gr"]
+
+    assert service.search("400").matches == []
+
+
+@patch("shop.services.product_search.Product.objects.all")
 def test_image_search_rejects_category_only_match(mock_all):
     products = [
         _product("Ansor tushonka", 10000, category="tushonka"),

@@ -12,6 +12,11 @@ BRAND_CATEGORIES: dict[str, str] = {
     "halol": "tushonka",
 }
 
+BRAND_SEARCH_ALIASES: dict[str, list[str]] = {
+    "president": ["president", "prezident"],
+    "prezident": ["president", "prezident"],
+}
+
 
 def canonical_category(term: str) -> str | None:
     normalized = term.lower().strip()
@@ -36,6 +41,11 @@ def expand_search_terms(text: str) -> list[str]:
         if brand in normalized:
             terms.add(brand)
             terms.add(category)
+
+    for brand, aliases in BRAND_SEARCH_ALIASES.items():
+        alias_set = {brand, *aliases}
+        if normalized in alias_set or any(alias in normalized.split() for alias in alias_set):
+            terms.update(alias_set)
 
     return [t for t in terms if t]
 
