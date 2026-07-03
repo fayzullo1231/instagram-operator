@@ -66,22 +66,24 @@ class ResponseBuilder:
         category: str,
         include_prices: bool,
     ) -> str:
-        names = [m.product.product_name for m in matches]
         display_category = category or "mahsulot"
-        lines = [f"• {name}" for name in names]
-        body = (
-            f"✅ Bizda quyidagi {display_category} mahsulotlari mavjud:\n\n"
-            + "\n".join(lines)
-            + "\n\nQaysi biri qiziqtiryapti?"
-        )
+        count = len(matches)
         if include_prices:
             price_lines = [
                 f"• {m.product.product_name} — {format_price(m.product.price)}"
                 for m in matches
             ]
             body = (
-                f"✅ Bizda quyidagi {display_category} mahsulotlari mavjud:\n\n"
+                f"✅ Bizda {count} ta {display_category} mahsulotlari mavjud:\n\n"
                 + "\n".join(price_lines)
+                + "\n\nQaysi biri qiziqtiryapti?"
+            )
+        else:
+            names = [m.product.product_name for m in matches]
+            lines = [f"• {name}" for name in names]
+            body = (
+                f"✅ Bizda {count} ta {display_category} mahsulotlari mavjud:\n\n"
+                + "\n".join(lines)
                 + "\n\nQaysi biri qiziqtiryapti?"
             )
         return body

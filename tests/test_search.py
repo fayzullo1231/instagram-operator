@@ -119,6 +119,7 @@ def test_category_list_response():
     )
     assert "Ansor" in reply
     assert "Poyqadam" in reply
+    assert "2 ta" in reply
     assert "Qaysi biri qiziqtiryapti" in reply
 
 

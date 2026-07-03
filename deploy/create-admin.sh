@@ -22,23 +22,38 @@ if [[ -z "$ADMIN_PASS" ]]; then
   exit 1
 fi
 
+PYTHON="venv/bin/python"
+if [[ ! -x "$PYTHON" ]]; then
+  echo "Xato: $APP_DIR/venv topilmadi. Avval: bash deploy/fix-venv.sh"
+  exit 1
+fi
+
 export DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS"
-venv/bin/python manage.py createsuperuser \
+export SCHEDULER_ENABLED=false
+
+if $PYTHON manage.py createsuperuser \
   --noinput \
   --username "$ADMIN_USER" \
-  --email "$ADMIN_EMAIL" 2>/dev/null \
-  && echo "Superuser '$ADMIN_USER' yaratildi" \
-  || venv/bin/python manage.py shell -c "
+  --email "$ADMIN_EMAIL" 2>/dev/null; then
+  echo "Superuser '$ADMIN_USER' yaratildi"
+else
+  $PYTHON manage.py shell -c "
 from django.contrib.auth import get_user_model
 User = get_user_model()
-u, created = User.objects.get_or_create(username='$ADMIN_USER', defaults={'email': '$ADMIN_EMAIL', 'is_staff': True, 'is_superuser': True})
+u, created = User.objects.get_or_create(
+    username='$ADMIN_USER',
+    defaults={'email': '$ADMIN_EMAIL', 'is_staff': True, 'is_superuser': True},
+)
 u.set_password('$ADMIN_PASS')
 u.is_staff = True
 u.is_superuser = True
+u.email = '$ADMIN_EMAIL'
 u.save()
 print('Yaratildi' if created else 'Parol yangilandi')
 "
+fi
 
+IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo ""
-echo "Panel: http://$(hostname -I | awk '{print $1}'):8010/panel/"
+echo "Panel: http://${IP:-13.140.146.78}:8010/panel/"
 echo "Login: $ADMIN_USER"

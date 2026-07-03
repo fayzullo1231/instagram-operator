@@ -6,7 +6,7 @@ from django.conf import settings
 from rapidfuzz import fuzz, process
 
 from shop.models import Product
-from shop.services.catalog_config import BRAND_CATEGORIES, canonical_category, expand_search_terms
+from shop.services.catalog_config import BRAND_CATEGORIES, CATEGORY_SYNONYMS, canonical_category, expand_search_terms
 from shop.services.image_hint import format_detected_label, normalize_image_hint
 from shop.utils.text import extract_search_keywords, normalize_search_text
 from shop.utils.transliterate import latinize, product_matches_grade, product_name_latin, weights_match
@@ -34,6 +34,12 @@ class ProductSearchService:
     def __init__(self) -> None:
         self.min_similarity = settings.FUZZ_MIN_SIMILARITY
         self.top_n = settings.FUZZ_TOP_N
+        self.category_limit = settings.CATEGORY_MATCH_LIMIT
+
+    def _limit_category_matches(self, matches: list[SearchMatch]) -> list[SearchMatch]:
+        if self.category_limit <= 0:
+            return matches
+        return matches[: self.category_limit]
 
     def search(self, query: str, *, allow_category: bool = True) -> SearchResult:
         products = list(Product.objects.all().order_by("product_name"))
@@ -62,7 +68,7 @@ class ProductSearchService:
             if category_matches:
                 logger.info("Kategoriya qidiruvi: '%s', topildi=%d", category, len(category_matches))
                 return SearchResult(
-                    matches=category_matches[: self.top_n],
+                    matches=self._limit_category_matches(category_matches),
                     is_category_match=True,
                     category=category,
                 )
@@ -82,25 +88,34 @@ class ProductSearchService:
     def _category_matches(self, products: list[Product], category: str) -> list[SearchMatch]:
         matches: list[SearchMatch] = []
         seen: set[str] = set()
+        synonyms = {category, *CATEGORY_SYNONYMS.get(category, [])}
 
         for product in products:
-            if product.category == category:
-                key = normalize_search_text(product.product_name)
-                if key in seen:
-                    continue
-                seen.add(key)
-                matches.append(SearchMatch(product=product, score=100.0, match_type="category"))
-                continue
-
-            normalized = normalize_search_text(product.product_name)
+            normalized_name = normalize_search_text(product.product_name)
+            haystack = normalize_search_text(
+                f"{product.product_name} {product.keywords} {product.category}"
+            )
+            in_category = product.category == category
+            in_name = any(
+                len(term) >= 4 and term in haystack for term in synonyms
+            )
+            in_brand = False
             for brand, brand_cat in BRAND_CATEGORIES.items():
-                if brand_cat == category and brand in normalized:
-                    if normalized in seen:
-                        continue
-                    seen.add(normalized)
-                    matches.append(SearchMatch(product=product, score=95.0, match_type="category"))
+                if brand_cat == category and brand in normalized_name:
+                    in_brand = True
                     break
 
+            if not (in_category or in_name or in_brand):
+                continue
+
+            key = normalized_name
+            if key in seen:
+                continue
+            seen.add(key)
+            score = 100.0 if in_category else 95.0 if in_brand else 90.0
+            matches.append(SearchMatch(product=product, score=score, match_type="category"))
+
+        matches.sort(key=lambda item: item.product.product_name.lower())
         return matches
 
     def _exact_matches(
