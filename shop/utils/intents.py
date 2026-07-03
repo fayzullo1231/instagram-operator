@@ -1,7 +1,7 @@
 import re
 from enum import Enum
 
-from shop.utils.text import normalize_search_text
+from shop.utils.text import extract_search_keywords, normalize_search_text
 
 
 class Intent(str, Enum):
@@ -68,8 +68,9 @@ def detect_intent(message: str) -> Intent:
     if asks_avail:
         return Intent.AVAILABILITY
 
-    product_hints = re.findall(r"\w+", normalized)
-    if len(product_hints) >= 1:
+    from shop.utils.text import extract_search_keywords
+
+    if extract_search_keywords(message):
         return Intent.PRODUCT
 
     return Intent.GENERAL

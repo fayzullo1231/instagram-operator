@@ -120,15 +120,11 @@ def _startup_tasks(instagram_ready: bool) -> None:
 
     if instagram_ready:
         _init_instagram()
-        return
 
-    if settings.SYNC_ON_STARTUP:
-        delay = settings.SYNC_STARTUP_DELAY_SECONDS
+    if settings.SYNC_ON_STARTUP or product_count == 0:
+        delay = settings.SYNC_STARTUP_DELAY_SECONDS if settings.SYNC_ON_STARTUP else 0
         if delay > 0:
             time.sleep(delay)
-        sync_products_job()
-    elif product_count == 0:
-        logger.info("Mahsulotlar bazasi bo'sh — sinxronizatsiya boshlanmoqda...")
         sync_products_job()
 
 

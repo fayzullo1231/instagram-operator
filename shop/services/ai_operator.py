@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 from django.conf import settings
 from openai import OpenAI
 
+from shop.models import Product
 from shop.services.operator_prompts import (
     ADDRESS_REPLY,
-    COMMENT_ASK_DM_REPLY,
     COMMENT_INFO_REPLY,
     COMMENT_PRICE_REPLY,
     CONVERSATIONAL_PROMPT,
@@ -18,10 +18,8 @@ from shop.services.operator_prompts import (
     IMAGE_FOUND_REPLY,
     INTENT_EXTRACTION_PROMPT,
     NOT_FOUND_FALLBACK,
-    NOT_FOUND_REPLY,
     PHONE_REPLY,
     PRODUCT_NOT_FOUND_PROMPT,
-    SYSTEM_PROMPT,
     THANKS_REPLY,
 )
 from shop.services.catalog_matcher import CatalogMatcherService
@@ -34,6 +32,8 @@ from shop.utils.text import extract_search_keywords, is_conversational_message, 
 
 logger = logging.getLogger(__name__)
 
+_catalog_sync_attempted = False
+
 
 @dataclass
 class ChatResponse:
@@ -45,7 +45,10 @@ class ChatResponse:
 
 class AIOperatorService:
     def __init__(self) -> None:
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
+        api_key = (settings.OPENAI_API_KEY or "").strip()
+        self.client = OpenAI(api_key=api_key) if api_key else None
+        if not self.client:
+            logger.warning("OPENAI_API_KEY yo'q — ChatGPT javoblari cheklangan")
         self.model = settings.OPENAI_MODEL
         self.search_service = ProductSearchService()
         self.response_builder = ResponseBuilder()
@@ -66,6 +69,7 @@ class AIOperatorService:
             return ChatResponse(reply=GREETING_REPLY)
 
         intent = detect_intent(message)
+
         if intent == Intent.GREETING or is_greeting_only(message):
             return ChatResponse(reply=self._answer_faq(message))
         if intent == Intent.THANKS:
@@ -88,22 +92,14 @@ class AIOperatorService:
         if is_conversational_message(message):
             return ChatResponse(reply=self._answer_faq(message))
 
-        search_query = self._extract_search_query(message)
-        if not search_query:
-            if intent == Intent.PRICE:
-                return ChatResponse(
-                    reply="Qaysi mahsulot narxi kerak? Mahsulot nomini yozib yuboring."
-                )
-            if intent in (Intent.GENERAL, Intent.PRODUCT) or is_conversational_message(message):
-                return ChatResponse(reply=self._answer_faq(message))
-            return ChatResponse(reply=self._answer_faq(message))
+        if intent == Intent.PRICE and not extract_search_keywords(message):
+            return ChatResponse(
+                reply="Qaysi mahsulot narxi kerak? Mahsulot nomini yozib yuboring."
+            )
 
-        logger.info("AI qidiruv so'rovi: '%s' (asl xabar: '%s')", search_query, message)
-
-        result = self.search_service.search(search_query)
-        is_single = self.search_service.is_single_match(result.matches)
-
+        result = self._search_catalog(message)
         if result.matches:
+            is_single = self.search_service.is_single_match(result.matches)
             reply = self.response_builder.build(
                 message,
                 result.matches,
@@ -117,45 +113,78 @@ class AIOperatorService:
                 matches=[self._match_to_dict(m) for m in result.matches],
             )
 
-        if self._is_likely_product_query(message, intent, search_query):
+        if intent in (Intent.PRICE, Intent.AVAILABILITY) and extract_search_keywords(message):
             return ChatResponse(reply=self._answer_product_not_found(message))
 
         return ChatResponse(reply=self._answer_faq(message))
 
+    def _ensure_catalog(self) -> None:
+        global _catalog_sync_attempted
+        if Product.objects.exists():
+            return
+        if _catalog_sync_attempted:
+            return
+        _catalog_sync_attempted = True
+        logger.info("Katalog bo'sh — mahsulotlarni yuklash...")
+        try:
+            from shop.services.product_sync import ProductSyncService
+
+            stats = ProductSyncService().sync_all()
+            logger.info("Avto-sinxronizatsiya: %s", stats)
+        except Exception as exc:
+            logger.warning("Avto-sinxronizatsiya xatosi: %s", exc)
+
+    def _search_catalog(self, message: str) -> SearchResult:
+        self._ensure_catalog()
+
+        queries: list[str] = []
+        local = extract_search_keywords(message)
+        if local:
+            queries.append(local)
+
+        refined = self._extract_search_query(message)
+        if refined and refined not in queries:
+            queries.append(refined)
+
+        for query in queries:
+            logger.info("Katalog qidiruvi: '%s' (asl: '%s')", query, message)
+            result = self.search_service.search(query)
+            if result.matches:
+                return result
+        return SearchResult(matches=[])
+
     def _comment_with_dm(self, message: str, intent: Intent) -> ChatResponse:
         public = COMMENT_PRICE_REPLY if intent == Intent.PRICE else COMMENT_INFO_REPLY
-        search_query = self._extract_search_query(message) or extract_search_keywords(message)
-        dm_reply = None
+        result = self._search_catalog(message)
 
-        if search_query:
-            result = self.search_service.search(search_query)
-            if result.matches:
-                dm_reply = self.response_builder.build_dm_details(
-                    message,
-                    result.matches,
-                    self.search_service.is_single_match(result.matches),
-                    is_category_match=result.is_category_match,
-                    category=result.category,
-                )
-            else:
-                dm_reply = self._answer_product_not_found(message)
-        elif intent == Intent.PRICE:
+        if result.matches:
+            dm_reply = self.response_builder.build_dm_details(
+                message,
+                result.matches,
+                self.search_service.is_single_match(result.matches),
+                is_category_match=result.is_category_match,
+                category=result.category,
+            )
+        elif intent == Intent.PRICE and not extract_search_keywords(message):
             dm_reply = "Qaysi mahsulot narxi kerak? Mahsulot nomini yozib yuboring."
+        elif is_conversational_message(message):
+            dm_reply = self._answer_faq(message)
+        elif extract_search_keywords(message):
+            dm_reply = self._answer_product_not_found(message)
         else:
-            dm_reply = GREETING_REPLY
+            dm_reply = self._answer_faq(message)
 
         return ChatResponse(reply=public, dm_reply=dm_reply, send_dm=True)
 
     def _comment_product_lead(self, message: str) -> ChatResponse:
-        search_query = self._extract_search_query(message)
-        if not search_query:
+        if is_conversational_message(message):
             return ChatResponse(
                 reply=COMMENT_INFO_REPLY,
-                dm_reply=GREETING_REPLY,
+                dm_reply=self._answer_faq(message),
                 send_dm=True,
             )
 
-        result = self.search_service.search(search_query)
+        result = self._search_catalog(message)
         if result.matches:
             dm_reply = self.response_builder.build_dm_details(
                 message,
@@ -171,9 +200,16 @@ class AIOperatorService:
                 matches=[self._match_to_dict(m) for m in result.matches],
             )
 
+        if extract_search_keywords(message):
+            return ChatResponse(
+                reply=COMMENT_INFO_REPLY,
+                dm_reply=self._answer_product_not_found(message),
+                send_dm=True,
+            )
+
         return ChatResponse(
             reply=COMMENT_INFO_REPLY,
-            dm_reply=self._answer_product_not_found(message),
+            dm_reply=self._answer_faq(message),
             send_dm=True,
         )
 
@@ -198,6 +234,7 @@ class AIOperatorService:
         detected_label = format_detected_label(product_hint)
         logger.info("Rasm tahlili: %s (confidence=%s)", product_hint, confidence or "n/a")
 
+        self._ensure_catalog()
         result = self.search_service.search_from_image_hint(product_hint)
         if not result.matches and self.client:
             logger.info("Mahalliy qidiruv topilmadi — AI katalog qidiruvi")
@@ -251,7 +288,6 @@ class AIOperatorService:
         )
 
     def _analyze_image(self, image_url: str, *, caption: str = "") -> tuple[dict | None, bool]:
-        """(mahsulot ma'lumoti, tahlil muvaffaqiyatli bo'ldimi)"""
         if not self.client:
             return None, False
 
@@ -308,14 +344,6 @@ class AIOperatorService:
             logger.warning("Rasm tahlilida xato: %s", exc)
             return None, False
 
-    def _is_likely_product_query(self, message: str, intent: Intent, search_query: str) -> bool:
-        if intent in (Intent.PRICE, Intent.AVAILABILITY):
-            return bool(search_query.strip())
-        if intent != Intent.PRODUCT:
-            return False
-        keywords = [w for w in search_query.split() if len(w) > 2]
-        return len(keywords) >= 1 and not is_conversational_message(message)
-
     def _answer_faq(self, message: str) -> str:
         return self._chat_reply(message, CONVERSATIONAL_PROMPT, fallback=GREETING_REPLY)
 
@@ -332,19 +360,20 @@ class AIOperatorService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message},
                 ],
-                temperature=0.4,
-                max_tokens=300,
+                temperature=0.5,
+                max_tokens=350,
             )
-            return (response.choices[0].message.content or fallback).strip()
+            text = (response.choices[0].message.content or "").strip()
+            if text:
+                return text
         except Exception as exc:
             logger.warning("ChatGPT javobida xato: %s", exc)
-            return fallback
+        return fallback
 
     def _extract_search_query(self, message: str) -> str:
         local_keywords = extract_search_keywords(message)
         if not local_keywords:
             return ""
-
         if not self.client:
             return local_keywords
 
