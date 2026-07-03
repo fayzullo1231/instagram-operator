@@ -16,7 +16,12 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 apt-get update -qq
-apt-get install -y -qq python3 python3-venv python3-pip git
+apt-get install -y -qq python3.12 python3.12-venv python3-pip git build-essential
+
+PYTHON_BIN="python3.12"
+if ! command -v "$PYTHON_BIN" &>/dev/null; then
+  PYTHON_BIN="python3"
+fi
 
 id "$APP_USER" &>/dev/null || useradd --system --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$APP_USER"
 
@@ -37,7 +42,8 @@ if [[ ! -f .env ]]; then
   echo "DIQQAT: .env faylini to'ldiring: nano $APP_DIR/.env"
 fi
 
-sudo -u "$APP_USER" python3 -m venv venv
+sudo -u "$APP_USER" "$PYTHON_BIN" -m venv venv
+sudo -u "$APP_USER" venv/bin/pip install --upgrade pip -q
 sudo -u "$APP_USER" venv/bin/pip install -r requirements.txt -q
 sudo -u "$APP_USER" mkdir -p data
 sudo -u "$APP_USER" venv/bin/python manage.py migrate --noinput
