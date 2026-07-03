@@ -62,7 +62,7 @@ class ProductSyncService:
             lambda item: self.kuloloptom_client.parse_product(item),
             lambda item: bool(item.get("name") and item.get("is_active", True)),
             skip_if=lambda: not self.kuloloptom_client.is_configured,
-            skip_reason="KulolOptom token yoki login/parol kerak",
+            skip_reason="KulolOptom o'chirilgan yoki TEZPOS_API_URL yo'q",
         )
         if kuloloptom_error:
             errors["kuloloptom"] = kuloloptom_error
@@ -167,6 +167,7 @@ class ProductSyncService:
             "total_count": linko_count + mdokon_count + tezpos_count + kuloloptom_count,
             "last_sync": last_sync.isoformat() if last_sync else None,
             "kuloloptom_configured": self.kuloloptom_client.is_configured,
+            "kuloloptom_has_auth": self.kuloloptom_client.has_auth_credentials,
             "mdokon_configured": self.mdokon_client.is_configured,
             "tezpos_configured": self.tezpos_client.is_configured,
             "last_errors": dict(_last_sync_report.get("errors") or {}),

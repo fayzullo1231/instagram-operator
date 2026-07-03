@@ -28,7 +28,8 @@
 <div class="card" style="margin-bottom:1.5rem">
   <h2 style="margin-bottom:0.75rem;font-size:1.1rem">Katalog sinxronizatsiyasi</h2>
   <p style="margin-bottom:0.75rem;color:#666">
-    KulolOptom: {% if sync.kuloloptom_configured %}sozlangan{% else %}<strong style="color:#c00">login/parol kerak</strong>{% endif %}
+    KulolOptom: {% if sync.kuloloptom_configured %}faol ({{ sync.kuloloptom_count }} ta){% else %}<strong style="color:#c00">o'chirilgan</strong>{% endif %}
+    {% if sync.kuloloptom_configured and not sync.kuloloptom_has_auth %}· tokensiz rejim{% endif %}
     · MDoKon: {% if sync.mdokon_configured %}sozlangan{% else %}<strong style="color:#c00">API key kerak</strong>{% endif %}
     {% if sync.last_sync %}· Oxirgi: {{ sync.last_sync }}{% endif %}
   </p>

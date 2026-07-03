@@ -15,20 +15,23 @@ class KulolOptomClient:
     def __init__(self) -> None:
         self.base_url = settings.TEZPOS_API_URL.rstrip("/")
         self.server_name = settings.KULOLOPTOM_SERVER_NAME
-        self.api_token = (settings.KULOLOPTOM_API_TOKEN or settings.TEZPOS_API_TOKEN or "").strip()
-        self.login = (settings.KULOLOPTOM_LOGIN or settings.TEZPOS_LOGIN or "").strip()
-        self.password = (settings.KULOLOPTOM_PASSWORD or settings.TEZPOS_PASSWORD or "").strip()
+        self.api_token = (settings.KULOLOPTOM_API_TOKEN or "").strip()
+        self.login = (settings.KULOLOPTOM_LOGIN or "").strip()
+        self.password = (settings.KULOLOPTOM_PASSWORD or "").strip()
         self.timeout = httpx.Timeout(60.0, connect=15.0)
         self._cached_token = ""
 
     @property
     def is_configured(self) -> bool:
-        return bool(
-            settings.KULOLOPTOM_ENABLED
-            and self.base_url
-            and self.server_name
-            and (self.api_token or (self.login and self.password))
-        )
+        return bool(settings.KULOLOPTOM_ENABLED and self.base_url and self.server_name)
+
+    @property
+    def has_auth_credentials(self) -> bool:
+        return bool(self.api_token or (self.login and self.password))
+
+    def _product_url(self) -> str:
+        query = urlencode({"all": "true"})
+        return f"{self.base_url}/{self.server_name}/product/?{query}"
 
     def _auth_headers(self) -> dict[str, str]:
         token = self.api_token or self._cached_token or self._login()
@@ -63,26 +66,59 @@ class KulolOptomClient:
             raise RuntimeError("KulolOptom login javobida token yo'q")
         return token
 
+    @staticmethod
+    def _parse_response(data: Any) -> list[dict[str, Any]]:
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            for key in ("results", "data", "items", "products"):
+                items = data.get(key)
+                if isinstance(items, list):
+                    return items
+        logger.error("KulolOptom API: kutilmagan javob formati")
+        return []
+
+    def _get_products(self, *, use_auth: bool) -> list[dict[str, Any]]:
+        url = self._product_url()
+        headers = self._auth_headers() if use_auth else None
+        mode = "auth" if use_auth else "public"
+
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.get(url, headers=headers)
+
+        if response.status_code == 401 and not use_auth:
+            logger.info("KulolOptom API: tokensiz kirish rad etildi (%s)", self.server_name)
+            return []
+
+        response.raise_for_status()
+        products = self._parse_response(response.json())
+        logger.info(
+            "KulolOptom API (%s): %d ta mahsulot yuklandi",
+            mode,
+            len(products),
+        )
+        return products
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def fetch_all_products(self) -> list[dict[str, Any]]:
         if not self.is_configured:
             return []
 
-        query = urlencode({"all": "true"})
-        url = f"{self.base_url}/{self.server_name}/product/?{query}"
         logger.info("KulolOptom API: mahsulotlar yuklanmoqda (%s)", self.server_name)
 
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.get(url, headers=self._auth_headers())
-            response.raise_for_status()
-            data = response.json()
+        products = self._get_products(use_auth=False)
+        if products:
+            return products
 
-        if not isinstance(data, list):
-            logger.error("KulolOptom API: kutilmagan javob formati")
-            return []
+        if self.has_auth_credentials:
+            logger.info("KulolOptom API: token/login bilan qayta urinilmoqda")
+            return self._get_products(use_auth=True)
 
-        logger.info("KulolOptom API: %d ta mahsulot yuklandi", len(data))
-        return data
+        raise RuntimeError(
+            "KulolOptom mahsulotlari yuklanmadi. "
+            "Serverda TEZPOS_API_URL=http://127.0.0.1:8000 bo'lishi kerak "
+            "yoki KULOLOPTOM_LOGIN/PASSWORD qo'shing."
+        )
 
     @staticmethod
     def parse_product(raw: dict[str, Any]) -> dict[str, Any]:

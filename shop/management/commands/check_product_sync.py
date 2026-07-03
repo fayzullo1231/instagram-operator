@@ -32,7 +32,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write(
                 self.style.WARNING(
-                    "KulolOptom: KULOLOPTOM_LOGIN/PASSWORD yoki TOKEN kerak (.env)"
+                    "KulolOptom: TEZPOS_API_URL va KULOLOPTOM_SERVER_NAME kerak (.env)"
                 )
             )
 
