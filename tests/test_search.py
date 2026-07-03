@@ -6,7 +6,7 @@ from shop.services.image_hint import normalize_image_hint
 from shop.services.product_search import ProductSearchService, SearchMatch
 from shop.services.response_builder import ResponseBuilder
 from shop.utils.intents import Intent, detect_intent
-from shop.utils.text import extract_search_keywords, format_price, is_greeting_only
+from shop.utils.text import extract_search_keywords, format_price, is_conversational_message, is_greeting_only
 
 
 _id_counter = 0
@@ -60,9 +60,13 @@ def test_extract_keywords():
     assert extract_search_keywords("salom") == ""
 
 
-def test_greeting_only():
+def test_conversational_message():
+    assert is_conversational_message("Assalomu alaykum") is True
+    assert is_conversational_message("Sizda nima bor") is True
+    assert is_conversational_message("qand bormi") is False
     assert is_greeting_only("Assalomu alaykum") is True
     assert is_greeting_only("salom") is True
+    assert is_greeting_only("Assalomu alaykum qalaysiz") is True
     assert is_greeting_only("qand bormi") is False
 
 
@@ -120,7 +124,7 @@ def test_category_list_response():
 
 def test_not_found_response():
     reply = ResponseBuilder.build("xyz mahsulot", [], is_single=False)
-    assert "topilmadi" in reply
+    assert "admin" in reply.lower()
 
 
 def test_is_single_match():

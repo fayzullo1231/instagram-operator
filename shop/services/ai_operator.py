@@ -10,6 +10,7 @@ from shop.services.operator_prompts import (
     COMMENT_ASK_DM_REPLY,
     COMMENT_INFO_REPLY,
     COMMENT_PRICE_REPLY,
+    CONVERSATIONAL_PROMPT,
     DELIVERY_REPLY,
     GREETING_REPLY,
     HOURS_REPLY,
@@ -18,8 +19,10 @@ from shop.services.operator_prompts import (
     IMAGE_FOUND_REPLY,
     IMAGE_UNCLEAR_REPLY,
     INTENT_EXTRACTION_PROMPT,
+    NOT_FOUND_FALLBACK,
     NOT_FOUND_REPLY,
     PHONE_REPLY,
+    PRODUCT_NOT_FOUND_PROMPT,
     SYSTEM_PROMPT,
     THANKS_REPLY,
 )
@@ -29,7 +32,7 @@ from shop.services.product_search import ProductSearchService, SearchMatch, Sear
 from shop.services.response_builder import ResponseBuilder
 from shop.utils.image_fetch import fetch_image_as_data_url
 from shop.utils.intents import Intent, detect_intent
-from shop.utils.text import extract_search_keywords, is_greeting_only
+from shop.utils.text import extract_search_keywords, is_conversational_message, is_greeting_only
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +69,9 @@ class AIOperatorService:
 
         intent = detect_intent(message)
         if intent == Intent.GREETING or is_greeting_only(message):
-            return ChatResponse(reply=GREETING_REPLY)
+            return ChatResponse(reply=self._answer_faq(message))
         if intent == Intent.THANKS:
-            return ChatResponse(reply=THANKS_REPLY)
+            return ChatResponse(reply=self._answer_faq(message))
         if intent == Intent.ADDRESS:
             return ChatResponse(reply=ADDRESS_REPLY)
         if intent == Intent.PHONE:
@@ -84,33 +87,42 @@ class AIOperatorService:
             if intent in (Intent.AVAILABILITY, Intent.PRODUCT):
                 return self._comment_product_lead(message)
 
+        if is_conversational_message(message):
+            return ChatResponse(reply=self._answer_faq(message))
+
         search_query = self._extract_search_query(message)
         if not search_query:
             if intent == Intent.PRICE:
                 return ChatResponse(
                     reply="Qaysi mahsulot narxi kerak? Mahsulot nomini yozib yuboring."
                 )
-            if intent == Intent.GENERAL:
+            if intent in (Intent.GENERAL, Intent.PRODUCT) or is_conversational_message(message):
                 return ChatResponse(reply=self._answer_faq(message))
-            return ChatResponse(reply=GREETING_REPLY)
+            return ChatResponse(reply=self._answer_faq(message))
 
         logger.info("AI qidiruv so'rovi: '%s' (asl xabar: '%s')", search_query, message)
 
         result = self.search_service.search(search_query)
         is_single = self.search_service.is_single_match(result.matches)
-        reply = self.response_builder.build(
-            message,
-            result.matches,
-            is_single,
-            channel=channel,
-            is_category_match=result.is_category_match,
-            category=result.category,
-        )
 
-        return ChatResponse(
-            reply=reply,
-            matches=[self._match_to_dict(m) for m in result.matches],
-        )
+        if result.matches:
+            reply = self.response_builder.build(
+                message,
+                result.matches,
+                is_single,
+                channel=channel,
+                is_category_match=result.is_category_match,
+                category=result.category,
+            )
+            return ChatResponse(
+                reply=reply,
+                matches=[self._match_to_dict(m) for m in result.matches],
+            )
+
+        if self._is_likely_product_query(message, intent, search_query):
+            return ChatResponse(reply=self._answer_product_not_found(message))
+
+        return ChatResponse(reply=self._answer_faq(message))
 
     def _comment_with_dm(self, message: str, intent: Intent) -> ChatResponse:
         public = COMMENT_PRICE_REPLY if intent == Intent.PRICE else COMMENT_INFO_REPLY
@@ -128,7 +140,7 @@ class AIOperatorService:
                     category=result.category,
                 )
             else:
-                dm_reply = NOT_FOUND_REPLY
+                dm_reply = self._answer_product_not_found(message)
         elif intent == Intent.PRICE:
             dm_reply = "Qaysi mahsulot narxi kerak? Mahsulot nomini yozib yuboring."
         else:
@@ -146,8 +158,6 @@ class AIOperatorService:
             )
 
         result = self.search_service.search(search_query)
-        public = COMMENT_INFO_REPLY if result.matches else NOT_FOUND_REPLY
-        dm_reply = None
         if result.matches:
             dm_reply = self.response_builder.build_dm_details(
                 message,
@@ -156,12 +166,17 @@ class AIOperatorService:
                 is_category_match=result.is_category_match,
                 category=result.category,
             )
+            return ChatResponse(
+                reply=COMMENT_INFO_REPLY,
+                dm_reply=dm_reply,
+                send_dm=True,
+                matches=[self._match_to_dict(m) for m in result.matches],
+            )
 
         return ChatResponse(
-            reply=public,
-            dm_reply=dm_reply,
-            send_dm=bool(dm_reply),
-            matches=[self._match_to_dict(m) for m in result.matches],
+            reply=COMMENT_INFO_REPLY,
+            dm_reply=self._answer_product_not_found(message),
+            send_dm=True,
         )
 
     def _process_image(
@@ -283,23 +298,37 @@ class AIOperatorService:
             logger.warning("Rasm tahlilida xato: %s", exc)
             return None, False
 
+    def _is_likely_product_query(self, message: str, intent: Intent, search_query: str) -> bool:
+        if intent in (Intent.PRICE, Intent.AVAILABILITY):
+            return bool(search_query.strip())
+        if intent != Intent.PRODUCT:
+            return False
+        keywords = [w for w in search_query.split() if len(w) > 2]
+        return len(keywords) >= 1 and not is_conversational_message(message)
+
     def _answer_faq(self, message: str) -> str:
+        return self._chat_reply(message, CONVERSATIONAL_PROMPT, fallback=GREETING_REPLY)
+
+    def _answer_product_not_found(self, message: str) -> str:
+        return self._chat_reply(message, PRODUCT_NOT_FOUND_PROMPT, fallback=NOT_FOUND_FALLBACK)
+
+    def _chat_reply(self, message: str, system_prompt: str, *, fallback: str) -> str:
         if not self.client:
-            return GREETING_REPLY
+            return fallback
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message},
                 ],
-                temperature=0.3,
+                temperature=0.4,
                 max_tokens=300,
             )
-            return (response.choices[0].message.content or GREETING_REPLY).strip()
+            return (response.choices[0].message.content or fallback).strip()
         except Exception as exc:
-            logger.warning("FAQ javobida xato: %s", exc)
-            return GREETING_REPLY
+            logger.warning("ChatGPT javobida xato: %s", exc)
+            return fallback
 
     def _extract_search_query(self, message: str) -> str:
         local_keywords = extract_search_keywords(message)
@@ -322,7 +351,7 @@ class AIOperatorService:
             )
             content = response.choices[0].message.content or "{}"
             data = json.loads(content)
-            if data.get("intent") in ("greeting", "thanks"):
+            if data.get("intent") in ("greeting", "thanks", "general"):
                 return ""
             category = data.get("category", "")
             if isinstance(category, str) and category.strip():

@@ -17,13 +17,17 @@ def normalize_search_text(text: str) -> str:
 STOP_WORDS = {
     "qancha", "nechpul", "nechchi", "necha", "bormi", "bor", "yoq",
     "narx", "narxi", "qanchadan", "dan", "ning", "ni", "ga", "da", "mi",
-    "mavjud", "qayerda", "qanday", "iltimos", "salom", "assalomu", "alaykum",
-    "aleykum", "alekum", "un", "uni", "haqida", "ayting", "yozing", "kerak",
+    "mavjud", "qayerda", "qanday", "qalesiz", "qalaysiz", "yaxshimisiz",
+    "yaxshimi", "tinchlikmi", "ahvolingiz", "ahvoli", "ishlaringiz",
+    "iltimos", "salom", "assalomu", "alaykum", "aleykum", "alekum",
+    "un", "uni", "haqida", "ayting", "yozing", "kerak",
     "olmoqchiman", "olaman", "sotib", "kg", "gr", "gramm", "kilogramm",
     "rahmat", "raxmat", "xayr", "hayr", "yaxshimisiz", "yaxshimisz",
-    "hello", "hi", "hayrli", "xayrli", "kun", "kech", "tuningiz", "xayrli",
+    "hello", "hi", "hayrli", "xayrli", "kun", "kech", "tuningiz",
     "dostavka", "yetkazib", "manzil", "adres", "telefon", "ish vaqti",
     "ochiqmisiz", "price", "info", "malumot", "ma'lumot", "qiziq",
+    "siz", "sizda", "sizlar", "bizga", "menga", "yordam", "bering",
+    "berolasizmi", "nima", "nimaga", "qayer", "qanaqa", "qandaysiz",
 }
 
 GREETING_PHRASES = {
@@ -40,6 +44,10 @@ GREETING_PHRASES = {
     "raxmat",
     "hello",
     "hi",
+    "assalomu alaykum qalaysiz",
+    "assalomu alaykum qandaysiz",
+    "salom qalaysiz",
+    "salom yaxshimisiz",
 }
 
 
@@ -55,4 +63,32 @@ def is_greeting_only(text: str) -> bool:
         return False
     if normalized in GREETING_PHRASES:
         return True
-    return not extract_search_keywords(text) and len(normalized.split()) <= 5
+    if not extract_search_keywords(text):
+        return len(normalized.split()) <= 8
+    return False
+
+
+_CONVERSATIONAL_PATTERNS = (
+    "nima bor",
+    "nimlar bor",
+    "nimalar bor",
+    "qanday mahsulot",
+    "qanday tovar",
+    "mahsulotlar bor",
+    "katalog",
+    "nimalar sotiladi",
+    "nima sotiladi",
+    "qanday yordam",
+)
+
+
+def is_conversational_message(text: str) -> bool:
+    """Mahsulot qidiruvi emas — salom, umumiy savol va hokazo."""
+    normalized = normalize_search_text(text)
+    if not normalized:
+        return True
+    if is_greeting_only(text):
+        return True
+    if any(pattern in normalized for pattern in _CONVERSATIONAL_PATTERNS):
+        return True
+    return not extract_search_keywords(text)
