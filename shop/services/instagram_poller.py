@@ -7,7 +7,20 @@ from shop.services.ai_operator import AIOperatorService
 from shop.services.comment_rules import match_comment_rule, rule_to_response
 from shop.services.dm_dedup import collapse_dm_messages
 from shop.services.instagram_client import InstagramClient
-from shop.services.operator_prompts import COMMENT_ASK_DM_REPLY, COMMENT_DM_FAILED_REPLY
+from shop.services.operator_prompts import (
+    COMMENT_ASK_DM_REPLY,
+    COMMENT_DM_FAILED_REPLY,
+    COMMENT_INFO_REPLY,
+)
+
+_PRIVATE_REPLY_ALREADY_SENT_MARKERS = (
+    "already",
+    "duplicate",
+    "private reply",
+    "one reply",
+    "already sent",
+    "allaqachon",
+)
 from shop.services.response_builder import ResponseBuilder
 from shop.services.zernio_client import ZernioRateLimitError
 
@@ -234,35 +247,20 @@ class InstagramPoller:
             if not self._try_claim(key, ProcessedMessage.TYPE_COMMENT):
                 continue
 
+            dm_sent = False
+            public_posted = False
+
             try:
                 rule = match_comment_rule(item["text"], str(item.get("media_id", "")))
                 if rule:
                     preset = rule_to_response(rule)
-                    public_reply = preset["reply"]
-                    image_url = preset.get("image_url")
-
-                    if public_reply:
-                        self.client.reply_to_comment(
-                            item["media_id"],
-                            item["comment_id"],
-                            public_reply,
-                            item.get("username", ""),
-                        )
-
-                    if preset["send_dm"]:
-                        dm_text = preset.get("dm_reply") or ""
-                        image_url = preset.get("image_url")
-                        dm_sent = self._deliver_comment_dm(item, dm_text, image_url=image_url)
-
-                        if not dm_sent and not public_reply:
-                            public_reply = COMMENT_DM_FAILED_REPLY
-                            self.client.reply_to_comment(
-                                item["media_id"],
-                                item["comment_id"],
-                                public_reply,
-                                item.get("username", ""),
-                            )
-
+                    dm_sent, public_posted = self._post_comment_reply(
+                        item,
+                        public_reply=preset["reply"],
+                        dm_reply=preset.get("dm_reply"),
+                        send_dm=preset["send_dm"],
+                        image_url=preset.get("image_url"),
+                    )
                     self._mark_processed(key, ProcessedMessage.TYPE_COMMENT)
                     self._add_to_baseline(item["comment_id"], comment=True)
                     processed += 1
@@ -277,36 +275,86 @@ class InstagramPoller:
                     item["text"],
                     channel=ResponseBuilder.CHANNEL_COMMENT,
                 )
-                public_reply = response.reply
+                dm_reply = response.dm_reply
+                if response.send_dm and dm_reply:
+                    dm_sent, public_posted = self._post_comment_reply(
+                        item,
+                        public_reply=response.reply,
+                        dm_reply=dm_reply,
+                        send_dm=True,
+                    )
+                elif response.send_dm and not dm_reply:
+                    dm_sent, public_posted = self._post_comment_reply(
+                        item,
+                        public_reply=COMMENT_ASK_DM_REPLY if not response.reply else response.reply,
+                        dm_reply=response.reply,
+                        send_dm=True,
+                        failure_reply=COMMENT_ASK_DM_REPLY,
+                    )
+                else:
+                    dm_sent, public_posted = self._post_comment_reply(
+                        item,
+                        public_reply=response.reply,
+                        send_dm=False,
+                    )
 
-                if response.send_dm and response.dm_reply:
-                    dm_sent = self._deliver_comment_dm(item, response.dm_reply)
-                    if not dm_sent:
-                        public_reply = COMMENT_DM_FAILED_REPLY
-                elif response.send_dm and not response.dm_reply:
-                    dm_sent = self._deliver_comment_dm(item, response.reply)
-                    if not dm_sent:
-                        public_reply = COMMENT_ASK_DM_REPLY
-
-                self.client.reply_to_comment(
-                    item["media_id"],
-                    item["comment_id"],
-                    public_reply,
-                    item.get("username", ""),
-                )
                 self._mark_processed(key, ProcessedMessage.TYPE_COMMENT)
                 self._add_to_baseline(item["comment_id"], comment=True)
                 processed += 1
                 logger.info("Izohga javob berildi: '%s...'", item["text"][:50])
             except ZernioRateLimitError as exc:
                 logger.warning("Izoh javob: rate limit — %s", exc)
-                ProcessedMessage.objects.filter(message_key=key).delete()
+                if dm_sent or public_posted:
+                    self._mark_processed(key, ProcessedMessage.TYPE_COMMENT)
+                    self._add_to_baseline(item["comment_id"], comment=True)
+                else:
+                    ProcessedMessage.objects.filter(message_key=key).delete()
                 break
             except Exception as exc:
                 logger.exception("Izoh qayta ishlash xatosi: %s", exc)
-                ProcessedMessage.objects.filter(message_key=key).delete()
+                if dm_sent or public_posted:
+                    self._mark_processed(key, ProcessedMessage.TYPE_COMMENT)
+                    self._add_to_baseline(item["comment_id"], comment=True)
+                else:
+                    ProcessedMessage.objects.filter(message_key=key).delete()
 
         return processed
+
+    def _post_comment_reply(
+        self,
+        item: dict,
+        *,
+        public_reply: str,
+        dm_reply: str | None = None,
+        send_dm: bool = False,
+        image_url: str | None = None,
+        failure_reply: str | None = None,
+    ) -> tuple[bool, bool]:
+        """Avval DM, keyin bitta ochiq izoh. 'Yubordik' faqat DM muvaffaqiyatli bo'lsa."""
+        dm_text = (dm_reply or "").strip()
+        needs_dm = send_dm and bool(dm_text or image_url)
+        dm_sent = True
+
+        if needs_dm:
+            dm_sent = self._deliver_comment_dm(item, dm_text, image_url=image_url)
+
+        if needs_dm:
+            final_public = (public_reply or COMMENT_INFO_REPLY) if dm_sent else (
+                failure_reply or COMMENT_DM_FAILED_REPLY
+            )
+        else:
+            final_public = public_reply
+
+        public_posted = False
+        if final_public:
+            self.client.reply_to_comment(
+                item["media_id"],
+                item["comment_id"],
+                final_public,
+                item.get("username", ""),
+            )
+            public_posted = True
+        return dm_sent, public_posted
 
     def _deliver_comment_dm(
         self,
@@ -371,9 +419,17 @@ class InstagramPoller:
             return True
         except Exception as exc:
             logger.warning("Private reply xatosi (comment=%s): %s", comment_id, exc)
+            if self._is_duplicate_private_reply_error(exc):
+                logger.info("Private reply allaqachon yuborilgan: comment=%s", comment_id)
+                return True
             if user_id:
                 return self._try_send_dm(user_id, text)
             return False
+
+    @staticmethod
+    def _is_duplicate_private_reply_error(exc: Exception) -> bool:
+        text = str(exc).lower()
+        return any(marker in text for marker in _PRIVATE_REPLY_ALREADY_SENT_MARKERS)
 
     def get_status(self) -> dict:
         if not self.enabled:
