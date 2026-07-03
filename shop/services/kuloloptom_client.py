@@ -12,7 +12,7 @@ class KulolOptomClient:
     """TezPOS tenant API: /{server_name}/product/?all=true"""
 
     def __init__(self) -> None:
-        self.base_url = settings.TEZPOS_API_URL.rstrip("/")
+        self.base_url = settings.KULOLOPTOM_API_URL.rstrip("/")
         self.server_name = settings.KULOLOPTOM_SERVER_NAME
         self.api_token = (settings.KULOLOPTOM_API_TOKEN or "").strip()
         self.login = (settings.KULOLOPTOM_LOGIN or "").strip()

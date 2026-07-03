@@ -50,8 +50,15 @@ class ProductSyncService:
             lambda: self.tezpos_client.fetch_all_products(),
             lambda item: self.tezpos_client.parse_product(item),
             lambda item: bool(item.get("name") and item.get("is_active", True)),
-            skip_if=lambda: not self.tezpos_client.is_configured,
-            skip_reason="TezPOS sozlanmagan",
+            skip_if=lambda: (
+                not self.tezpos_client.is_configured
+                or self.kuloloptom_client.is_configured
+            ),
+            skip_reason=(
+                "KulolOptom API ishlatiladi — TezPOS demo sinxronizatsiyasi kerak emas"
+                if self.kuloloptom_client.is_configured
+                else "TezPOS sozlanmagan"
+            ),
         )
         if tezpos_error:
             errors["tezpos"] = tezpos_error
@@ -62,7 +69,7 @@ class ProductSyncService:
             lambda item: self.kuloloptom_client.parse_product(item),
             lambda item: bool(item.get("name") and item.get("is_active", True)),
             skip_if=lambda: not self.kuloloptom_client.is_configured,
-            skip_reason="KulolOptom o'chirilgan yoki TEZPOS_API_URL yo'q",
+            skip_reason="KulolOptom o'chirilgan yoki KULOLOPTOM_API_URL yo'q",
         )
         if kuloloptom_error:
             errors["kuloloptom"] = kuloloptom_error

@@ -103,14 +103,18 @@ MDOKON_API_URL = os.getenv(
 )
 MDOKON_API_KEY = os.getenv("MDOKON_API_KEY", "")
 
-TEZPOS_ENABLED = os.getenv("TEZPOS_ENABLED", "true").lower() == "true"
-TEZPOS_API_URL = os.getenv("TEZPOS_API_URL", "http://13.140.146.78:8000")
+TEZPOS_ENABLED = os.getenv("TEZPOS_ENABLED", "false").lower() == "true"
+TEZPOS_API_URL = os.getenv("TEZPOS_API_URL", "http://127.0.0.1:8000")
 TEZPOS_SERVER_NAME = os.getenv("TEZPOS_SERVER_NAME", "demo")
 TEZPOS_API_TOKEN = os.getenv("TEZPOS_API_TOKEN", "")
 TEZPOS_LOGIN = os.getenv("TEZPOS_LOGIN", "demo")
 TEZPOS_PASSWORD = os.getenv("TEZPOS_PASSWORD", "demo123")
 
 KULOLOPTOM_ENABLED = os.getenv("KULOLOPTOM_ENABLED", "true").lower() == "true"
+KULOLOPTOM_API_URL = os.getenv(
+    "KULOLOPTOM_API_URL",
+    os.getenv("TEZPOS_API_URL", "http://127.0.0.1:8000"),
+).rstrip("/")
 KULOLOPTOM_SERVER_NAME = os.getenv("KULOLOPTOM_SERVER_NAME", "kuloloptom-2")
 KULOLOPTOM_API_TOKEN = os.getenv("KULOLOPTOM_API_TOKEN", "")
 KULOLOPTOM_LOGIN = os.getenv("KULOLOPTOM_LOGIN", "")

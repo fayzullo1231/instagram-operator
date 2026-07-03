@@ -41,7 +41,7 @@ set_var("KULOLOPTOM_SERVER_NAME", "kuloloptom-2")
 set_var("KULOLOPTOM_API_TOKEN", token)
 set_var("KULOLOPTOM_LOGIN", "")
 set_var("KULOLOPTOM_PASSWORD", "")
-set_var("TEZPOS_API_URL", "http://127.0.0.1:8000")
+set_var("KULOLOPTOM_API_URL", "http://127.0.0.1:8000")
 
 env_path.write_text(text, encoding="utf-8")
 print(f"Yangilandi: {env_path}")

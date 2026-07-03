@@ -12,8 +12,9 @@ fi
 if ! grep -q '^KULOLOPTOM_ENABLED=' "$ENV_FILE"; then
   cat >> "$ENV_FILE" << 'EOF'
 
-# KulolOptom katalog (TezPOS tenant)
+# KulolOptom katalog API
 KULOLOPTOM_ENABLED=true
+KULOLOPTOM_API_URL=http://127.0.0.1:8000
 KULOLOPTOM_SERVER_NAME=kuloloptom-2
 KULOLOPTOM_API_TOKEN=
 KULOLOPTOM_LOGIN=

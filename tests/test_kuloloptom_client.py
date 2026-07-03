@@ -26,7 +26,7 @@ def test_kuloloptom_parse_product_uses_name_and_price():
 
 @override_settings(
     KULOLOPTOM_ENABLED=True,
-    TEZPOS_API_URL="http://127.0.0.1:8000",
+    KULOLOPTOM_API_URL="http://13.140.146.78:8000/",
     KULOLOPTOM_SERVER_NAME="kuloloptom-2",
     KULOLOPTOM_API_TOKEN="",
     KULOLOPTOM_LOGIN="",
@@ -40,7 +40,7 @@ def test_kuloloptom_configured_without_token():
 
 @override_settings(
     KULOLOPTOM_ENABLED=True,
-    TEZPOS_API_URL="http://127.0.0.1:8000",
+    KULOLOPTOM_API_URL="http://127.0.0.1:8000",
     KULOLOPTOM_SERVER_NAME="kuloloptom-2",
     KULOLOPTOM_API_TOKEN="test-token-123",
     KULOLOPTOM_LOGIN="",
@@ -68,7 +68,7 @@ def test_kuloloptom_fetch_uses_api_token_without_login(mock_client_cls):
 
 @override_settings(
     KULOLOPTOM_ENABLED=True,
-    TEZPOS_API_URL="http://127.0.0.1:8000",
+    KULOLOPTOM_API_URL="http://127.0.0.1:8000",
     KULOLOPTOM_SERVER_NAME="kuloloptom-2",
     KULOLOPTOM_API_TOKEN="",
     KULOLOPTOM_LOGIN="",

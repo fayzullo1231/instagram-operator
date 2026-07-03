@@ -22,7 +22,7 @@ class Command(BaseCommand):
         mdokon = MDoKonClient()
 
         self.stdout.write("=== Sozlamalar ===")
-        self.stdout.write(f"TEZPOS_API_URL: {settings.TEZPOS_API_URL}")
+        self.stdout.write(f"KULOLOPTOM_API_URL: {settings.KULOLOPTOM_API_URL}")
         self.stdout.write(f"KULOLOPTOM_SERVER_NAME: {settings.KULOLOPTOM_SERVER_NAME}")
         self.stdout.write(f"KULOLOPTOM_ENABLED: {settings.KULOLOPTOM_ENABLED}")
         self.stdout.write(
