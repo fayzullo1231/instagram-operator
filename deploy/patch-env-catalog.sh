@@ -35,8 +35,7 @@ fi
 
 echo ""
 echo "Keyin .env da to'ldiring:"
-echo "  KULOLOPTOM_LOGIN=... (kuloloptom-2 admin)"
-echo "  KULOLOPTOM_PASSWORD=..."
-echo "  MDOKON_API_KEY=... (agar boshqa bo'lsa)"
+echo "  KULOLOPTOM_API_TOKEN=... (tavsiya etiladi)"
+echo "  yoki KULOLOPTOM_LOGIN=... va KULOLOPTOM_PASSWORD=..."
 echo ""
 echo "Tekshirish: venv/bin/python manage.py check_product_sync --sync"

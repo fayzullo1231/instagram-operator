@@ -4,7 +4,6 @@ from urllib.parse import urlencode
 
 import httpx
 from django.conf import settings
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -33,19 +32,23 @@ class KulolOptomClient:
         query = urlencode({"all": "true"})
         return f"{self.base_url}/{self.server_name}/product/?{query}"
 
+    def _resolve_token(self) -> str:
+        if self.api_token:
+            return self.api_token
+        if self._cached_token:
+            return self._cached_token
+        if self.login and self.password:
+            self._cached_token = self._login()
+            return self._cached_token
+        raise RuntimeError("KulolOptom: KULOLOPTOM_API_TOKEN yoki login/parol kerak")
+
     def _auth_headers(self) -> dict[str, str]:
-        token = self.api_token or self._cached_token or self._login()
-        self._cached_token = token
         return {
-            "Authorization": f"Token {token}",
+            "Authorization": f"Token {self._resolve_token()}",
             "X-Server-Name": self.server_name,
         }
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def _login(self) -> str:
-        if not self.login or not self.password:
-            raise RuntimeError("KulolOptom: token yoki login/parol kerak")
-
         url = f"{self.base_url}/api/auth/login/"
         logger.info("KulolOptom API: login (%s)", self.server_name)
 
@@ -81,7 +84,7 @@ class KulolOptomClient:
     def _get_products(self, *, use_auth: bool) -> list[dict[str, Any]]:
         url = self._product_url()
         headers = self._auth_headers() if use_auth else None
-        mode = "auth" if use_auth else "public"
+        mode = "token" if use_auth and self.api_token else "auth" if use_auth else "public"
 
         with httpx.Client(timeout=self.timeout) as client:
             response = client.get(url, headers=headers)
@@ -90,7 +93,10 @@ class KulolOptomClient:
             logger.info("KulolOptom API: tokensiz kirish rad etildi (%s)", self.server_name)
             return []
 
-        response.raise_for_status()
+        if response.status_code >= 400:
+            detail = response.text[:300]
+            raise RuntimeError(f"KulolOptom API {response.status_code}: {detail}")
+
         products = self._parse_response(response.json())
         logger.info(
             "KulolOptom API (%s): %d ta mahsulot yuklandi",
@@ -99,25 +105,26 @@ class KulolOptomClient:
         )
         return products
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def fetch_all_products(self) -> list[dict[str, Any]]:
         if not self.is_configured:
             return []
 
         logger.info("KulolOptom API: mahsulotlar yuklanmoqda (%s)", self.server_name)
 
+        if self.api_token:
+            return self._get_products(use_auth=True)
+
         products = self._get_products(use_auth=False)
         if products:
             return products
 
-        if self.has_auth_credentials:
-            logger.info("KulolOptom API: token/login bilan qayta urinilmoqda")
+        if self.login and self.password:
+            logger.info("KulolOptom API: login bilan qayta urinilmoqda")
             return self._get_products(use_auth=True)
 
         raise RuntimeError(
             "KulolOptom mahsulotlari yuklanmadi. "
-            "Serverda TEZPOS_API_URL=http://127.0.0.1:8000 bo'lishi kerak "
-            "yoki KULOLOPTOM_LOGIN/PASSWORD qo'shing."
+            ".env ga KULOLOPTOM_API_TOKEN qo'shing yoki login/parol kiriting."
         )
 
     @staticmethod
