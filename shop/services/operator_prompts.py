@@ -31,23 +31,12 @@ HOURS_REPLY = (
 DELIVERY_REPLY = "❌ Hozircha yetkazib berish xizmati mavjud emas."
 
 NOT_FOUND_REPLY = (
-    "❌ Kechirasiz, ushbu mahsulot hozircha katalogimizda topilmadi.\n\n"
-    "Boshqa mahsulot nomini yozib yuboring."
+    "So'rovingiz uchun rahmat. Adminlarimiz tez orada sizga javob berishadi."
 )
 
-IMAGE_FOUND_REPLY = "✅ Rasmdagi mahsulot katalogimizda topildi."
-IMAGE_NOT_FOUND_REPLY = (
-    "❌ Rasmdagi mahsulot katalogimizda topilmadi.\n\n"
-    "Iltimos, mahsulot nomini yozib yuboring yoki yorqinroq rasm yuboring."
-)
-IMAGE_UNCLEAR_REPLY = (
-    "Rasmdagi mahsulotni aniq aniqlab bo'lmadi.\n\n"
-    "Iltimos, mahsulot yaxshi ko'rinadigan rasm yuboring yoki mahsulot nomini yozing."
-)
-IMAGE_ANALYSIS_FAILED_REPLY = (
-    "Rasmni tahlil qila olmadim.\n\n"
-    "Iltimos, mahsulot nomini yozib yuboring yoki boshqa rasm yuboring."
-)
+NOT_FOUND_FALLBACK = NOT_FOUND_REPLY
+
+IMAGE_FOUND_REPLY = "Rasmdagi mahsulot do'konimizda topildi."
 
 COMMENT_PRICE_REPLY = "💬 Narx ma'lumotlarini sizga Direct xabarda yubordik."
 COMMENT_INFO_REPLY = "💬 Ma'lumotlarni sizga Direct orqali yubordik."
@@ -67,13 +56,6 @@ Qoidalar:
 - intent: "greeting" | "thanks" | "address" | "phone" | "hours" | "delivery" | "price" | "availability" | "product" | "general"
 - category: agar kategoriya qidiruvi bo'lsa (masalan tushonka) — kategoriya nomi, aks holda bo'sh
 """
-
-NOT_FOUND_REPLY = (
-    "So'rovingiz uchun rahmat. Adminlarimiz tez orada sizga javob berishadi.\n\n"
-    "Iltimos, mahsulot nomini yoki rasmini yana bir bor yuboring — tezroq yordam beramiz."
-)
-
-NOT_FOUND_FALLBACK = NOT_FOUND_REPLY
 
 CONVERSATIONAL_PROMPT = """Sen Kulol Optom do'konining Instagram operatorisan.
 
@@ -111,8 +93,7 @@ QOIDALAR:
 SYSTEM_PROMPT = CONVERSATIONAL_PROMPT
 
 IMAGE_ANALYSIS_PROMPT = """Sen oziq-ovqat mahsulotlarini rasmdan taniydigan mutaxassissan.
-
-VAZIFA: Rasmdagi mahsulot NIMA ekanligini to'liq aniqlang — qadoqdagi reklama sloganlarini qidiruv uchun ISHLATMANG.
+O'z biliming va vizual tahlil orqali mahsulotni internetdagi nomiga yaqin aniqlang.
 
 QADAMLAR:
 1. Rasmdagi mahsulotni KO'RING: qadoq shakli, rangi, logotip, brend, tur, hajm.
@@ -164,9 +145,11 @@ Sizga rasmdan ANIQLANGAN mahsulot (brend + tur + hajm) va katalog ro'yxati beril
 Qadoq sloganlari emas — mahsulotning haqiqiy nomi asosida BITTA eng mos mahsulotni tanlang.
 
 Qoidalar:
-- Faqat JSON javob: {"found": true, "product_id": 123, "product_name": "..."} yoki {"found": false}
+- Faqat JSON javob: {"found": true, "product_id": 123, "product_name": "...", "similarity": 95} yoki {"found": false}
 - product_id va product_name katalogdagi qiymat bilan mos bo'lsin
+- similarity — 0 dan 100 gacha moslik foizi
+- found:true faqat similarity >= 90 bo'lsa
 - Og'irlik/hajm raqami mos kelishi kerak (750 gr ≈ 750 ml, 5кг un = 5, 5l = 5)
 - Kirill va lotin nomlar bir xil mahsulot bo'lishi mumkin (МариМолокo = MARI MALAKO)
 - "в/с" = "высший сорт" = eng yuqori sifat un
-- Aniq mos kelmasa found:false qaytaring — taxmin qilmang"""
+- 90% dan past moslik bo'lsa found:false — taxmin qilmang"""

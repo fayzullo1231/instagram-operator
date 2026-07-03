@@ -108,6 +108,15 @@ class CatalogMatcherService:
         if not data.get("found"):
             return SearchResult(matches=[])
 
+        similarity = float(data.get("similarity") or 0)
+        if similarity and similarity < settings.IMAGE_MATCH_MIN_SCORE:
+            logger.info(
+                "AI katalog moslik yetarli emas: %s < %s",
+                similarity,
+                settings.IMAGE_MATCH_MIN_SCORE,
+            )
+            return SearchResult(matches=[])
+
         product_id = data.get("product_id")
         product_name = str(data.get("product_name") or "").strip()
         product = None
@@ -121,4 +130,54 @@ class CatalogMatcherService:
         logger.info("AI katalog moslashtirish: '%s'", product.product_name)
         return SearchResult(
             matches=[SearchMatch(product=product, score=95.0, match_type="ai_catalog")]
+        )
+
+    def match_by_fuzzy(self, hint: dict, *, min_score: int | None = None) -> SearchResult:
+        threshold = settings.IMAGE_MATCH_MIN_SCORE if min_score is None else min_score
+        products = list(Product.objects.all().order_by("product_name"))
+        if not products:
+            return SearchResult(matches=[])
+
+        search_text = build_catalog_search_text(
+            str(hint.get("catalog_search_query") or ""),
+            str(hint.get("identified_product") or ""),
+            str(hint.get("brand") or ""),
+            str(hint.get("product_name") or ""),
+            " ".join(str(item) for item in hint.get("search_queries") or []),
+        )
+        if not search_text:
+            return SearchResult(matches=[])
+
+        weight = extract_volume_digits(
+            str(hint.get("weight_grams") or hint.get("weight") or hint.get("package_size") or "")
+        )
+        if weight:
+            filtered = [
+                product
+                for product in products
+                if weight in re.sub(r"[^\d]", "", normalize_search_text(product.product_name))
+            ]
+            if filtered:
+                products = filtered
+
+        choices = {
+            product.id: latinize(f"{product.product_name} {product.keywords}")
+            for product in products
+        }
+        results = process.extract(search_text, choices, scorer=fuzz.WRatio, limit=1)
+        if not results:
+            return SearchResult(matches=[])
+
+        _, score, product_id = results[0]
+        if score < threshold:
+            logger.info("Rasm fuzzy moslik yetarli emas: %s < %s", score, threshold)
+            return SearchResult(matches=[])
+
+        product = Product.objects.filter(id=product_id).first()
+        if not product:
+            return SearchResult(matches=[])
+
+        logger.info("Rasm fuzzy moslashtirish: '%s' (ball=%s)", product.product_name, score)
+        return SearchResult(
+            matches=[SearchMatch(product=product, score=float(score), match_type="fuzzy_image")]
         )

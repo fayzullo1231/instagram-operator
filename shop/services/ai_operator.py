@@ -14,10 +14,8 @@ from shop.services.operator_prompts import (
     DELIVERY_REPLY,
     GREETING_REPLY,
     HOURS_REPLY,
-    IMAGE_ANALYSIS_FAILED_REPLY,
     IMAGE_ANALYSIS_PROMPT,
     IMAGE_FOUND_REPLY,
-    IMAGE_UNCLEAR_REPLY,
     INTENT_EXTRACTION_PROMPT,
     NOT_FOUND_FALLBACK,
     NOT_FOUND_REPLY,
@@ -187,15 +185,15 @@ class AIOperatorService:
         channel: str,
     ) -> ChatResponse:
         product_hint, analysis_ok = self._analyze_image(image_url, caption=message)
-        if not analysis_ok:
-            return ChatResponse(reply=IMAGE_ANALYSIS_FAILED_REPLY)
-        if not product_hint:
-            return ChatResponse(reply=IMAGE_UNCLEAR_REPLY)
+        if not analysis_ok or not product_hint:
+            logger.info("Rasm tahlili muvaffaqiyatsiz — javob yuborilmaydi")
+            return self._empty_reply()
 
         product_hint = normalize_image_hint(product_hint)
         confidence = str(product_hint.get("confidence") or "").lower()
         if confidence == "low":
-            return ChatResponse(reply=IMAGE_UNCLEAR_REPLY)
+            logger.info("Rasm confidence=low — javob yuborilmaydi")
+            return self._empty_reply()
 
         detected_label = format_detected_label(product_hint)
         logger.info("Rasm tahlili: %s (confidence=%s)", product_hint, confidence or "n/a")
@@ -205,17 +203,31 @@ class AIOperatorService:
             logger.info("Mahalliy qidiruv topilmadi — AI katalog qidiruvi")
             result = self.catalog_matcher.match_with_ai(product_hint, detected_label)
         if not result.matches:
+            logger.info("AI katalog topilmadi — fuzzy 90%% qidiruv")
+            result = self.catalog_matcher.match_by_fuzzy(product_hint)
+        if not result.matches:
             logger.info(
-                "Rasm katalogda topilmadi — javob yuborilmaydi: %s",
+                "Rasm katalogda mos mahsulot yo'q (>=90%%) — javob yuborilmaydi: %s",
                 detected_label or "noma'lum",
             )
-            return ChatResponse(reply="")
+            return self._empty_reply()
 
-        match = result.matches[0]
+        return self._image_catalog_reply(message, result, channel=channel)
+
+    def _empty_reply(self) -> ChatResponse:
+        return ChatResponse(reply="")
+
+    def _image_catalog_reply(
+        self,
+        message: str,
+        result: SearchResult,
+        *,
+        channel: str,
+    ) -> ChatResponse:
         is_single = True
         if channel == ResponseBuilder.CHANNEL_COMMENT:
             dm_reply = self.response_builder.build_dm_details(
-                message or detected_label,
+                message,
                 result.matches,
                 is_single,
             )
@@ -227,14 +239,12 @@ class AIOperatorService:
             )
 
         product_reply = self.response_builder.build(
-            message or detected_label,
+            message,
             result.matches,
             is_single,
             channel=channel,
         )
-        intro = IMAGE_FOUND_REPLY
-        reply = f"{intro}\n\n{product_reply}"
-
+        reply = f"{IMAGE_FOUND_REPLY}\n\n{product_reply}"
         return ChatResponse(
             reply=reply,
             matches=[self._match_to_dict(m) for m in result.matches],
