@@ -38,14 +38,13 @@ NOT_FOUND_FALLBACK = NOT_FOUND_REPLY
 
 IMAGE_FOUND_REPLY = "Rasmdagi mahsulot do'konimizda topildi."
 
-COMMENT_PRICE_REPLY = "💬 Narx ma'lumotlarini sizga Direct xabarda yubordik."
-COMMENT_INFO_REPLY = "💬 Ma'lumotlarni sizga Direct orqali yubordik."
+COMMENT_PRICE_REPLY = "Narx ma'lumotlarini sizga Direct xabarda yubordik."
+COMMENT_INFO_REPLY = "Ma'lumotlarni sizga Direct orqali yubordik."
 COMMENT_DM_FAILED_REPLY = (
-    "💬 Sizga xabar yuborishga urinib ko'rdik, ammo akkauntingiz yopiq bo'lgani "
-    "sababli xabar yuborib bo'lmadi.\n\n"
+    "Ma'lumotlarni Direct orqali yuborib bo'lmadi.\n\n"
     "Iltimos bizga Direct orqali yozib yuboring."
 )
-COMMENT_ASK_DM_REPLY = "💬 Iltimos bizga Direct orqali yozib yuboring."
+COMMENT_ASK_DM_REPLY = "Iltimos bizga Direct orqali yozib yuboring."
 
 INTENT_EXTRACTION_PROMPT = """Siz Kulol Optom do'konining Instagram operatori yordamchisisiz.
 Foydalanuvchi xabaridan qidiruv ma'lumotlarini ajrating.

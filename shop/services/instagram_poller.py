@@ -251,21 +251,8 @@ class InstagramPoller:
 
                     if preset["send_dm"]:
                         dm_text = preset.get("dm_reply") or ""
-                        if image_url:
-                            dm_sent = self._try_send_dm(
-                                item.get("user_id", ""),
-                                dm_text,
-                                image_url=image_url,
-                            )
-                        elif dm_text:
-                            dm_sent = self._try_send_private_reply(
-                                item["media_id"],
-                                item["comment_id"],
-                                dm_text,
-                                item.get("user_id", ""),
-                            )
-                        else:
-                            dm_sent = True
+                        image_url = preset.get("image_url")
+                        dm_sent = self._deliver_comment_dm(item, dm_text, image_url=image_url)
 
                         if not dm_sent and not public_reply:
                             public_reply = COMMENT_DM_FAILED_REPLY
@@ -293,11 +280,11 @@ class InstagramPoller:
                 public_reply = response.reply
 
                 if response.send_dm and response.dm_reply:
-                    dm_sent = self._try_send_dm(item.get("user_id", ""), response.dm_reply)
+                    dm_sent = self._deliver_comment_dm(item, response.dm_reply)
                     if not dm_sent:
                         public_reply = COMMENT_DM_FAILED_REPLY
                 elif response.send_dm and not response.dm_reply:
-                    dm_sent = self._try_send_dm(item.get("user_id", ""), response.reply)
+                    dm_sent = self._deliver_comment_dm(item, response.reply)
                     if not dm_sent:
                         public_reply = COMMENT_ASK_DM_REPLY
 
@@ -320,6 +307,37 @@ class InstagramPoller:
                 ProcessedMessage.objects.filter(message_key=key).delete()
 
         return processed
+
+    def _deliver_comment_dm(
+        self,
+        item: dict,
+        text: str,
+        *,
+        image_url: str | None = None,
+    ) -> bool:
+        """Izoh egasiga DM: avval comment private-reply, keyin mavjud suhbat orqali."""
+        user_id = item.get("user_id", "")
+        dm_sent = False
+
+        if text:
+            dm_sent = self._try_send_private_reply(
+                item["media_id"],
+                item["comment_id"],
+                text,
+                user_id,
+            )
+
+        if image_url:
+            image_sent = self._try_send_dm(
+                user_id,
+                "" if dm_sent else text,
+                image_url=image_url,
+            )
+            return dm_sent or image_sent
+
+        if text:
+            return dm_sent
+        return True
 
     def _try_send_dm(
         self,
