@@ -51,9 +51,39 @@ Foydalanuvchi xabaridan qidiruv ma'lumotlarini ajrating.
 
 Qoidalar:
 - Faqat JSON formatda javob bering
-- search_query: mahsulot nomi, brend yoki kategoriya (salom bo'lsa bo'sh)
+- Xato yozilgan brend va mahsulotlarni TO'G'RILANG (masalan: prizdent→president, prezident→president, mari moloko→mari malako)
+- search_query: eng aniq bitta qidiruv so'zi (lotin, salom bo'lsa bo'sh)
+- search_queries: 1-3 ta qidiruv varianti (lotin, xato yozuvlarni to'g'rilangan holda)
 - intent: "greeting" | "thanks" | "address" | "phone" | "hours" | "delivery" | "price" | "availability" | "product" | "general"
 - category: agar kategoriya qidiruvi bo'lsa (masalan tushonka) — kategoriya nomi, aks holda bo'sh
+"""
+
+SEARCH_CORRECTION_PROMPT = """Sen Kulol Optom do'koni katalog qidiruv mutaxassisisan.
+
+Foydalanuvchi mahsulot so'radi, lekin so'z xato yozilgan bo'lishi mumkin.
+Xabardan katalogda qidirish uchun TO'G'RI variantlarni chiqar (o'zbek/kirill → lotin).
+
+Misol:
+- "prizdent qancha" → ["president", "prezident"]
+- "prezident sut" → ["president sut", "prezident sut"]
+- "mari malako 750" → ["mari malako 750"]
+
+JSON format:
+{"search_queries": ["variant1", "variant2"], "skip": false}
+
+Agar bu mahsulot so'rovi emas (faqat salom, manzil va hokazo) → {"search_queries": [], "skip": true}
+Faqat JSON, boshqa matn yo'q."""
+
+SEARCH_RESULT_VALIDATION_PROMPT = """Sen Kulol Optom katalogini tekshiruvchisisiz.
+
+Foydalanuvchi so'rovi va kandidat mahsulotlar ro'yxati beriladi.
+Faqat HAQIQATAN mos keladigan mahsulotlarni tanlang.
+
+Qoidalar:
+- Noto'g'ri taxmin QILMANG — shubhali bo'lsa confident=false
+- Foydalanuvchi brendini xato yozgan bo'lsa ham to'g'ri brend mahsulotlarini tanlang
+- Faqat berilgan ro'yxatdan id tanlang
+- JSON: {"product_ids": [1, 2], "confident": true} yoki {"product_ids": [], "confident": false}
 """
 
 CONVERSATIONAL_PROMPT = """Sen Kulol Optom do'konining Instagram operatorisan.

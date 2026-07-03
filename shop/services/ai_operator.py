@@ -26,9 +26,11 @@ from shop.services.catalog_matcher import CatalogMatcherService
 from shop.services.image_hint import format_detected_label, normalize_image_hint
 from shop.services.product_search import ProductSearchService, SearchMatch, SearchResult
 from shop.services.response_builder import ResponseBuilder
+from shop.services.text_catalog_matcher import TextCatalogMatcherService
 from shop.utils.image_fetch import fetch_image_as_data_url
 from shop.utils.intents import Intent, detect_intent
 from shop.utils.text import extract_search_keywords, is_conversational_message, is_greeting_only
+from shop.utils.transliterate import latinize
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,7 @@ class AIOperatorService:
         self.search_service = ProductSearchService()
         self.response_builder = ResponseBuilder()
         self.catalog_matcher = CatalogMatcherService(self.client, self.model)
+        self.text_catalog_matcher = TextCatalogMatcherService(self.client, self.model)
 
     def process_message(
         self,
@@ -137,21 +140,47 @@ class AIOperatorService:
     def _search_catalog(self, message: str) -> SearchResult:
         self._ensure_catalog()
 
+        queries = self._build_search_queries(message)
+        tried: list[str] = []
+
+        for query in queries:
+            tried.append(query)
+            logger.info("Katalog qidiruvi: '%s' (asl: '%s')", query, message)
+            result = self._validate_catalog_result(message, self.search_service.search(query))
+            if result.matches:
+                return result
+
+        if self.client:
+            for query in self.text_catalog_matcher.suggest_queries(message, tried=tried):
+                tried.append(query)
+                logger.info("ChatGPT qidiruv varianti: '%s' (asl: '%s')", query, message)
+                result = self._validate_catalog_result(message, self.search_service.search(query))
+                if result.matches:
+                    return result
+
+        return SearchResult(matches=[])
+
+    def _build_search_queries(self, message: str) -> list[str]:
         queries: list[str] = []
         local = extract_search_keywords(message)
         if local:
-            queries.append(local)
+            queries.append(latinize(local) or local)
 
-        refined = self._extract_search_query(message)
-        if refined and refined not in queries:
-            queries.append(refined)
+        for refined in self._extract_search_queries(message):
+            normalized = latinize(refined) or refined
+            if normalized and normalized not in queries:
+                queries.append(normalized)
+        return queries
 
-        for query in queries:
-            logger.info("Katalog qidiruvi: '%s' (asl: '%s')", query, message)
-            result = self.search_service.search(query)
-            if result.matches:
-                return result
-        return SearchResult(matches=[])
+    def _validate_catalog_result(self, message: str, result: SearchResult) -> SearchResult:
+        if not result.matches:
+            return result
+        if self.search_service.is_trusted_result(result):
+            return result
+        if not settings.CATALOG_GPT_VALIDATE or not self.client:
+            logger.info("Ishonchsiz qidiruv natijasi rad etildi (GPT yo'q yoki o'chirilgan)")
+            return SearchResult(matches=[])
+        return self.text_catalog_matcher.filter_matches(message, result.matches)
 
     def _comment_with_dm(self, message: str, intent: Intent) -> ChatResponse:
         public = COMMENT_PRICE_REPLY if intent == Intent.PRICE else COMMENT_INFO_REPLY
@@ -370,12 +399,13 @@ class AIOperatorService:
             logger.warning("ChatGPT javobida xato: %s", exc)
         return fallback
 
-    def _extract_search_query(self, message: str) -> str:
+    def _extract_search_queries(self, message: str) -> list[str]:
         local_keywords = extract_search_keywords(message)
+        queries: list[str] = []
         if not local_keywords:
-            return ""
+            return queries
         if not self.client:
-            return local_keywords
+            return [local_keywords]
 
         try:
             response = self.client.chat.completions.create(
@@ -385,24 +415,39 @@ class AIOperatorService:
                     {"role": "user", "content": message},
                 ],
                 temperature=0.1,
-                max_tokens=150,
+                max_tokens=180,
                 response_format={"type": "json_object"},
             )
             content = response.choices[0].message.content or "{}"
             data = json.loads(content)
             if data.get("intent") in ("greeting", "thanks", "general"):
-                return ""
+                return queries
+
             category = data.get("category", "")
             if isinstance(category, str) and category.strip():
-                return category.strip()
+                queries.append(category.strip())
+
+            raw_queries = data.get("search_queries") or []
+            if isinstance(raw_queries, list):
+                for item in raw_queries:
+                    if isinstance(item, str) and item.strip():
+                        refined = extract_search_keywords(item.strip()) or latinize(item.strip())
+                        if refined and refined not in queries:
+                            queries.append(refined)
+
             search_query = data.get("search_query", local_keywords)
             if isinstance(search_query, str) and search_query.strip():
-                refined = extract_search_keywords(search_query.strip())
-                return refined or search_query.strip()
+                refined = extract_search_keywords(search_query.strip()) or latinize(search_query.strip())
+                if refined and refined not in queries:
+                    queries.append(refined)
         except Exception as exc:
             logger.warning("OpenAI qidiruv ajratishda xato: %s — mahalliy qidiruv", exc)
+            if local_keywords and local_keywords not in queries:
+                queries.append(local_keywords)
 
-        return local_keywords
+        if local_keywords and local_keywords not in queries:
+            queries.append(local_keywords)
+        return queries
 
     @staticmethod
     def _match_to_dict(match: SearchMatch) -> dict:

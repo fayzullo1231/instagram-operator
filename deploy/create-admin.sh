@@ -31,26 +31,14 @@ fi
 export DJANGO_SUPERUSER_PASSWORD="$ADMIN_PASS"
 export SCHEDULER_ENABLED=false
 
-if $PYTHON manage.py createsuperuser \
-  --noinput \
+if $PYTHON manage.py create_panel_admin \
   --username "$ADMIN_USER" \
-  --email "$ADMIN_EMAIL" 2>/dev/null; then
-  echo "Superuser '$ADMIN_USER' yaratildi"
+  --email "$ADMIN_EMAIL" \
+  --password "$ADMIN_PASS"; then
+  :
 else
-  $PYTHON manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-u, created = User.objects.get_or_create(
-    username='$ADMIN_USER',
-    defaults={'email': '$ADMIN_EMAIL', 'is_staff': True, 'is_superuser': True},
-)
-u.set_password('$ADMIN_PASS')
-u.is_staff = True
-u.is_superuser = True
-u.email = '$ADMIN_EMAIL'
-u.save()
-print('Yaratildi' if created else 'Parol yangilandi')
-"
+  echo "Xato: superuser yaratib bo'lmadi"
+  exit 1
 fi
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')

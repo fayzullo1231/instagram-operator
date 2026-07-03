@@ -19,6 +19,7 @@ from shop.utils.transliterate import latinize, product_matches_grade, product_na
 
 logger = logging.getLogger(__name__)
 
+_TRUSTED_MATCH_TYPES = frozenset({"exact", "keyword", "category", "catalog", "ai_catalog"})
 _CATALOG_OPTIONAL_LINES = frozenset({"yog", ""})
 
 
@@ -242,6 +243,29 @@ class ProductSearchService:
                 break
 
         return matches
+
+    @staticmethod
+    def is_trusted_result(result: SearchResult) -> bool:
+        """Foydalanuvchiga yuborish uchun natija ishonchli ekanini tekshiradi."""
+        if not result.matches:
+            return False
+        if result.is_category_match:
+            return True
+
+        match_types = {match.match_type for match in result.matches}
+        if match_types <= _TRUSTED_MATCH_TYPES:
+            return True
+
+        if match_types == {"fuzzy"}:
+            top_score = result.matches[0].score
+            if top_score < settings.CATALOG_FUZZ_TRUST_MIN:
+                return False
+            if len(result.matches) == 1:
+                return True
+            service = ProductSearchService()
+            return service.is_single_match(result.matches)
+
+        return False
 
     @staticmethod
     def is_single_match(matches: list[SearchMatch]) -> bool:
