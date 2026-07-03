@@ -16,12 +16,9 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 apt-get update -qq
-apt-get install -y -qq python3.12 python3.12-venv python3-pip git build-essential
+apt-get install -y -qq python3 python3-venv python3-pip git build-essential
 
-PYTHON_BIN="python3.12"
-if ! command -v "$PYTHON_BIN" &>/dev/null; then
-  PYTHON_BIN="python3"
-fi
+PYTHON_BIN="python3"
 
 id "$APP_USER" &>/dev/null || useradd --system --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$APP_USER"
 

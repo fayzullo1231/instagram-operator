@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Serverda pip/venv xatosi bo'lsa (Python 3.14 + rapidfuzz build)
+# Serverda pip/venv xatosi bo'lsa
 # Ishlatish: bash deploy/fix-venv.sh
 set -euo pipefail
 
@@ -9,13 +9,9 @@ cd "$APP_DIR"
 git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 
 apt-get update -qq
-apt-get install -y -qq python3.12 python3.12-venv build-essential git
+apt-get install -y -qq python3 python3-venv build-essential git
 
-PYTHON_BIN="python3.12"
-if ! command -v "$PYTHON_BIN" &>/dev/null; then
-  PYTHON_BIN="python3"
-fi
-
+PYTHON_BIN="python3"
 echo "Python: $($PYTHON_BIN --version)"
 
 rm -rf venv
@@ -33,6 +29,7 @@ chmod 600 .env 2>/dev/null || true
 if [[ -f /etc/systemd/system/instagram-operator.service ]]; then
   systemctl daemon-reload
   systemctl restart instagram-operator
+  sleep 2
   systemctl status instagram-operator --no-pager
 else
   echo "systemd yo'q — qo'lda ishga tushiring:"
